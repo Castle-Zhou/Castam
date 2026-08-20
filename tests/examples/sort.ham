@@ -1,0 +1,7 @@
+arr = [1, 2, 3, 4, 5],
+sort <- arr => 
+    if (arr.length > 0)
+        sort(arr | _ < arr[0]) + 
+        (arr | _ == arr[0]) + 
+        sort(arr | _ > arr[0])
+    else arr,

@@ -1,0 +1,21 @@
+{ os } = import("os"),
+{ cl } = import("cl"),
+
+game = (os) => {
+    os = os.random,
+    ans = os.value,
+
+    guess <- (os) => {
+        os = os.input,
+        val = os.value
+    } <| if (.val == ans)
+        .os.output("You win!\n")
+    else if (.val < ans)
+        guess(.os.output("Too small.\n"))
+    else
+        guess(.os.output("Too Big.\n"))
+} <| .guess(.os),
+
+mainCl = cl(game(os))
+
+// ham ./guess.ham --entry='mainCl' --output guess

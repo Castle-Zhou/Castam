@@ -1,0 +1,12 @@
+sum <- 0 <| (first, ...rest) => first + sum(rest...),
+
+// sum(1, 2, 3) = 0(1, 2, 3) <| ((first, ...rest) => first + sum(rest...))(1, 2, 3)
+//              = {} <| 1 + sum(2, 3)
+//              = 1 + (0(2, 3) <| ((first, ...rest) => first + sum(rest...))(2, 3))
+//              = 1 + ({} <| 2 + sum(3))
+//              = 1 + 2 + (0(3) <| ((first, ...rest) => first + sum(rest...))(3))
+//              = 1 + 2 + ({} <| 3 + sum())
+//              = 1 + 2 + 3 + (0() <| ((first, ...rest) => first + sum(rest...))())
+//              = 1 + 2 + 3 + (0 <| {})
+//              = 1 + 2 + 3 + 0
+//              = 6

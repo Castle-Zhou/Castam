@@ -1,0 +1,6 @@
+#next <- () => ({ count = .count + 1 } <| .count <| #next),
+createCounter = (initCount) => ({ count = initCount } <| .count <| #next),
+
+counter = createCounter(0), // { count = 0 } <| 0 <| #next
+counter = counter(),        // { count = 1 } <| 1 <| #next
+counter = counter(),        // { count = 2 } <| 2 <| #next
