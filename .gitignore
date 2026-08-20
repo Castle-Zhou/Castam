@@ -27,3 +27,6 @@ logs/
 *.temp
 icons/temp/
 
+
+# Build output
+build/
