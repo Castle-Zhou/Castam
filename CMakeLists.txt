@@ -9,6 +9,7 @@ add_compile_options(-Wall -Wextra)
 
 add_library(castam_core STATIC
   src/lexer.cpp
+  src/ast_dump.cpp
 )
 target_include_directories(castam_core PUBLIC src)
 
@@ -20,3 +21,7 @@ enable_testing()
 add_executable(lexer_test tests/lexer_test.cpp)
 target_link_libraries(lexer_test PRIVATE castam_core)
 add_test(NAME lexer_test COMMAND lexer_test)
+
+add_executable(ast_dump_test tests/ast_dump_test.cpp)
+target_link_libraries(ast_dump_test PRIVATE castam_core)
+add_test(NAME ast_dump_test COMMAND ast_dump_test)
