@@ -69,16 +69,17 @@ static void testIdents() {
                 TK::Ident);
     CHECK_KINDS("_", TK::Underscore);
     CHECK_KINDS("_ + 1", TK::Underscore, TK::Plus, TK::IntLit);
-    // 关键字
-    CHECK_KINDS("if else in notin subseteq subset true false", TK::KwIf,
-                TK::KwElse, TK::KwIn, TK::KwNotin, TK::KwSubseteq, TK::KwSubset,
-                TK::KwTrue, TK::KwFalse);
+    // 关键字（in 是 let in 的分隔符，集合判定为 is/isnt）
+    CHECK_KINDS("if else in is isnt subseteq subset true false", TK::KwIf,
+                TK::KwElse, TK::KwIn, TK::KwIs, TK::KwIsnt, TK::KwSubseteq,
+                TK::KwSubset, TK::KwTrue, TK::KwFalse);
     // import 和内置集合名是普通标识符
     CHECK_KINDS("import Int Float Bool Anything Something Nothing Array",
                 TK::Ident, TK::Ident, TK::Ident, TK::Ident, TK::Ident, TK::Ident,
                 TK::Ident, TK::Ident);
-    // 包含 in 的标识符不能被拆出关键字
-    CHECK_KINDS("inc input inside", TK::Ident, TK::Ident, TK::Ident);
+    // 包含 in/is 的标识符不能被拆出关键字
+    CHECK_KINDS("inc input inside issue island isnta", TK::Ident, TK::Ident,
+                TK::Ident, TK::Ident, TK::Ident, TK::Ident);
 }
 
 static void testNumbers() {

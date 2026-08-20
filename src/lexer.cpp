@@ -32,8 +32,10 @@ namespace castam {
             return "KwElse";
         case TK::KwIn:
             return "KwIn";
-        case TK::KwNotin:
-            return "KwNotin";
+        case TK::KwIs:
+            return "KwIs";
+        case TK::KwIsnt:
+            return "KwIsnt";
         case TK::KwSubseteq:
             return "KwSubseteq";
         case TK::KwSubset:
@@ -137,11 +139,12 @@ namespace castam {
         // 只把有语法角色的词列为关键字（实现决策：文档里 import 和内置集合名
         // 没有特殊语法地位，按普通标识符处理）
         TK keywordKind(const std::string &s) {
-            static const std::array<std::pair<const char *, TK>, 11> kKeywords{{
+            static const std::array<std::pair<const char *, TK>, 12> kKeywords{{
                 {"if", TK::KwIf},
                 {"else", TK::KwElse},
                 {"in", TK::KwIn},
-                {"notin", TK::KwNotin},
+                {"is", TK::KwIs},
+                {"isnt", TK::KwIsnt},
                 {"subseteq", TK::KwSubseteq},
                 {"subset", TK::KwSubset},
                 {"true", TK::KwTrue},

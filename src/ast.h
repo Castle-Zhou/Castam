@@ -23,8 +23,8 @@ namespace castam {
     // 二元运算符，优先级见 HAM 0x07 附录
     // `as` 不在其中，它是专用节点 As（右侧必须是集合/类型表达式，HAM 0x02）
     enum class BinOp {
-        In,       // in（HAM 0x03）
-        NotIn,    // notin
+        Is,       // is（HAM 0x03）
+        Isnt,     // isnt
         Subseteq, // subseteq
         Subset,   // subset
         Delta,    // <|（HAM 0x00/0x01）
@@ -180,7 +180,7 @@ namespace castam {
     // 临时组合（HAM 0x01）：let {comb} in body 与 body where {comb}
     // 两种写法语义相同，parser 把 where 形式也归一到此节点
     // comb 可为任意表达式，不限组合字面量（如 x + y where comb <| { x = 3 }）
-    // 优先级第 3 级（HAM 0x07 附录，在 =/<- 声明之下、in 族集合判定之上）
+    // 优先级第 3 级（HAM 0x07 附录，在 =/<- 声明之下、is 族集合判定之上）
     struct TempComb {
         NodePtr comb;
         NodePtr body;

@@ -6,10 +6,10 @@ namespace castam {
 
         const char *binOpSymbol(BinOp op) {
             switch (op) {
-            case BinOp::In:
-                return "in";
-            case BinOp::NotIn:
-                return "notin";
+            case BinOp::Is:
+                return "is";
+            case BinOp::Isnt:
+                return "isnt";
             case BinOp::Subseteq:
                 return "subseteq";
             case BinOp::Subset:

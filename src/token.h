@@ -19,8 +19,9 @@ namespace castam {
         // 关键字
         KwIf,
         KwElse,
-        KwIn,
-        KwNotin,
+        KwIn,   // let {comb} in ... 的分隔符（HAM 0x01）
+        KwIs,   // is（集合判定，HAM 0x03）
+        KwIsnt, // isnt
         KwSubseteq,
         KwSubset,
         KwTrue,

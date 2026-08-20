@@ -128,8 +128,8 @@ static void testLambdas() {
 
 static void testBinOpSymbols() {
     const std::pair<BinOp, const char *> kCases[] = {
-        {BinOp::In, "in"},
-        {BinOp::NotIn, "notin"},
+        {BinOp::Is, "is"},
+        {BinOp::Isnt, "isnt"},
         {BinOp::Subseteq, "subseteq"},
         {BinOp::Subset, "subset"},
         {BinOp::Delta, "<|"},
