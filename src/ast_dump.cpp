@@ -273,6 +273,13 @@ namespace castam {
                 }
                 out += ")";
             }
+            void operator()(const TempComb &v) {
+                out += "(tempcomb ";
+                dumpChild(v.comb, out);
+                out += " ";
+                dumpChild(v.body, out);
+                out += ")";
+            }
 
             void operator()(const Proj &v) {
                 out += "(. ";

@@ -221,6 +221,23 @@ static void testNewSyntax() {
                 TK::LBracket, TK::RBracket);
 }
 
+// 临时组合（let/where，HAM 0x01）
+
+static void testTempCombSyntax() {
+    CHECK_KINDS("let { x = 1, y = 2 } in x + y", TK::KwLet, TK::LBrace,
+                TK::Ident, TK::Eq, TK::IntLit, TK::Comma, TK::Ident, TK::Eq,
+                TK::IntLit, TK::RBrace, TK::KwIn, TK::Ident, TK::Plus,
+                TK::Ident);
+    CHECK_KINDS("a where { a = 2 }", TK::Ident, TK::KwWhere, TK::LBrace,
+                TK::Ident, TK::Eq, TK::IntLit, TK::RBrace);
+    // 非字面量用法：where 后可接任意表达式（HAM 0x01）
+    CHECK_KINDS("x + y where comb <| { x = 3 }", TK::Ident, TK::Plus, TK::Ident,
+                TK::KwWhere, TK::Ident, TK::Delta, TK::LBrace, TK::Ident, TK::Eq,
+                TK::IntLit, TK::RBrace);
+    // 整词匹配：letx、wherever 仍是普通标识符
+    CHECK_KINDS("letx wherever inlet", TK::Ident, TK::Ident, TK::Ident);
+}
+
 // 错误用例
 
 static void testErrors() {
@@ -253,6 +270,7 @@ int main() {
     RUN(testSumHamSnippet);
     RUN(testCounterHamSnippet);
     RUN(testNewSyntax);
+    RUN(testTempCombSyntax);
     RUN(testErrors);
 
     if (g_failures == 0) {

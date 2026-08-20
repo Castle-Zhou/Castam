@@ -177,6 +177,15 @@ namespace castam {
         NodePtr elseBranch;
     };
 
+    // 临时组合（HAM 0x01）：let {comb} in body 与 body where {comb}
+    // 两种写法语义相同，parser 把 where 形式也归一到此节点
+    // comb 可为任意表达式，不限组合字面量（如 x + y where comb <| { x = 3 }）
+    // 优先级第 3 级（HAM 0x07 附录，在 =/<- 声明之下、in 族集合判定之上）
+    struct TempComb {
+        NodePtr comb;
+        NodePtr body;
+    };
+
     // a.x 投影（HAM 0x00）
     struct Proj {
         NodePtr obj;
@@ -225,8 +234,8 @@ namespace castam {
         SrcLoc loc;
         std::variant<IntLit, FloatLit, CharLit, StrLit, BoolLit, Ident, Placeholder,
                      BacktickOp, CombLit, CombSet, EnumSet, PredSet, Lambda, Binary, As,
-                     Unary, IfExpr, Proj, ContextProj, Index, ArrayType, Call, ArrayLit,
-                     StructLit, Spread, Typed>
+                     Unary, IfExpr, TempComb, Proj, ContextProj, Index, ArrayType, Call,
+                     ArrayLit, StructLit, Spread, Typed>
             kind;
     };
 

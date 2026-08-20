@@ -44,6 +44,10 @@ namespace castam {
             return "KwFalse";
         case TK::KwAs:
             return "KwAs";
+        case TK::KwLet:
+            return "KwLet";
+        case TK::KwWhere:
+            return "KwWhere";
         case TK::LParen:
             return "LParen";
         case TK::RParen:
@@ -133,7 +137,7 @@ namespace castam {
         // 只把有语法角色的词列为关键字（实现决策：文档里 import 和内置集合名
         // 没有特殊语法地位，按普通标识符处理）
         TK keywordKind(const std::string &s) {
-            static const std::array<std::pair<const char *, TK>, 9> kKeywords{{
+            static const std::array<std::pair<const char *, TK>, 11> kKeywords{{
                 {"if", TK::KwIf},
                 {"else", TK::KwElse},
                 {"in", TK::KwIn},
@@ -143,6 +147,8 @@ namespace castam {
                 {"true", TK::KwTrue},
                 {"false", TK::KwFalse},
                 {"as", TK::KwAs},
+                {"let", TK::KwLet},
+                {"where", TK::KwWhere},
             }};
             for (const auto &[word, kind] : kKeywords) {
                 if (s == word)

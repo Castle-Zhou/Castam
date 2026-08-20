@@ -172,6 +172,12 @@ static void testUnaryAsIf() {
     checkDump(makeNode(std::move(noElse)), "(if (ident c) (int 100))");
     IfExpr withElse{id("c"), num("100"), num("10")};
     checkDump(makeNode(std::move(withElse)), "(if (ident c) (int 100) (int 10))");
+
+    // 临时组合：let { x = 1 } in (y <| 2)
+    CombLit tc;
+    tc.items.push_back(decl(PatIdent{"x"}, num("1")));
+    checkDump(makeNode(TempComb{makeNode(std::move(tc)), bin(BinOp::Delta, id("y"), num("2"))}),
+              "(tempcomb (comb (decl x (int 1))) (<| (ident y) (int 2)))");
 }
 
 // 投影、下标、调用与容器

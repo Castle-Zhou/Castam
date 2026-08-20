@@ -11,9 +11,9 @@
 //              返回值标注插入 (ret T)，`_` 糖生成的头为 lambda*
 //              参数项：x | (typed x T) | (rest x) | (restall x)
 //   运算       (SYM L R)（SYM 为运算符原文）| (as E T) | (not/compl/neg E)
-//   其余       (if C T [E]) | (. E key) | (. key) | (index E I) | (arrty E)
-//              (call f A...) | (call$ f A...) | (array E...) | (struct E...)
-//              (spread E) | (spreadall E) | (typed E T)
+//   其余       (if C T [E]) | (tempcomb C E) | (. E key) | (. key) | (index E I)
+//              (arrty E) | (call f A...) | (call$ f A...) | (array E...)
+//              (struct E...) | (spread E) | (spreadall E) | (typed E T)
 // SrcLoc 不参与 dump
 
 #include <string>

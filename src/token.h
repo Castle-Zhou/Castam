@@ -26,6 +26,8 @@ namespace castam {
         KwTrue,
         KwFalse,
         KwAs,
+        KwLet,   // let {comb} in ...（临时组合，HAM 0x01）
+        KwWhere, // ... where {comb}（同上）
         // 括号与分隔符
         LParen,
         RParen,
