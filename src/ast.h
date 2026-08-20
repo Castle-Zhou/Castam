@@ -21,7 +21,7 @@ namespace castam {
     using NodePtr = std::unique_ptr<Node>;
 
     // 二元运算符，优先级见 HAM 0x07 附录
-    // `as` 不在其中，它是专用节点 As（右侧必须是集合/类型表达式，b904171）
+    // `as` 不在其中，它是专用节点 As（右侧必须是集合/类型表达式，HAM 0x02）
     enum class BinOp {
         In,       // in（HAM 0x03）
         NotIn,    // notin
@@ -92,7 +92,7 @@ namespace castam {
         PackKind pack = PackKind::None;
     };
 
-    // 泛型参数（HAM 0x06，bc13f4d）
+    // 泛型参数（HAM 0x06）
     struct GenericParam {
         std::string name;
         NodePtr bound; // 可空：<T: U> 的 U
@@ -147,7 +147,7 @@ namespace castam {
     };
 
     // 函数声明式（HAM 0x01）
-    // 含 b904171 的返回值标注（(x: Int) -> Int => ...）与 bc13f4d 的泛型（<T: U> ...）
+    // 含 HAM 0x02 的返回值标注（(x: Int) -> Int => ...）与 0x06 的泛型（<T: U> ...）
     struct Lambda {
         std::vector<GenericParam> generics;
         std::vector<Param> params;
@@ -161,7 +161,7 @@ namespace castam {
         NodePtr lhs;
         NodePtr rhs;
     };
-    // as 类型标记（b904171）：x = 1 as Int
+    // as 类型标记（HAM 0x02）：x = 1 as Int
     struct As {
         NodePtr expr;
         NodePtr type;

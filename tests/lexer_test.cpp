@@ -189,7 +189,7 @@ static void testCounterHamSnippet() {
         TK::RParen, TK::Comma);
 }
 
-// 新语法（HAM b904171/bc13f4d）
+// 新语法（as、泛型、返回值标注，HAM 0x02/0x06）
 
 static void testNewSyntax() {
     // as 关键字（键的类型标记）：x = 1 as Int
