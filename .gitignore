@@ -5,6 +5,7 @@
 
 # IDEs and editors
 .idea/
+.vscode/c_cpp_properties.json
 *.swp
 *.swo
 *~

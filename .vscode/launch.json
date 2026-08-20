@@ -1,0 +1,32 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "castam lex (当前文件)",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/castam",
+            "args": ["lex", "${file}"],
+            "cwd": "${workspaceFolder}",
+            "preLaunchTask": "Build castam"
+        },
+        {
+            "name": "castam lexer_test",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/lexer_test",
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "preLaunchTask": "Build castam"
+        },
+        {
+            "name": "castam ast_dump_test",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/ast_dump_test",
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "preLaunchTask": "Build castam"
+        }
+    ]
+}
