@@ -94,14 +94,12 @@ static void testNumbers() {
 }
 
 static void testStrings() {
-    auto toks = castam::lex(R"('a' "abc" 'os' "hi\n" '\'')");
+    auto toks = castam::lex(R"('a' "abc" "hi\n" '\'')");
     CHECK(toks[0].kind == TK::CharLit && toks[0].text == "a");
     CHECK(toks[1].kind == TK::StrLit && toks[1].text == "abc");
-    // 多字符单引号宽容为字符串（文档里 import('os') 的写法）
-    CHECK(toks[2].kind == TK::StrLit && toks[2].text == "os");
-    CHECK(toks[3].kind == TK::StrLit && toks[3].text == "hi\n");
-    CHECK(toks[4].kind == TK::CharLit && toks[4].text == "'");
-    CHECK(toks[5].kind == TK::Eof);
+    CHECK(toks[2].kind == TK::StrLit && toks[2].text == "hi\n");
+    CHECK(toks[3].kind == TK::CharLit && toks[3].text == "'");
+    CHECK(toks[4].kind == TK::Eof);
 }
 
 // 运算符最长匹配
@@ -248,6 +246,8 @@ static void testErrors() {
     CHECK(lexThrows("a .. b", 1, 3));            // `..`
     CHECK(lexThrows("ok = 1,\nBAD = `+", 2, 7)); // 未闭合反引号（第 2 行）
     CHECK(lexThrows("x = \"a\\q\"", 1, 8));      // 未知转义（位于 q）
+    CHECK(lexThrows("x = 'os'", 1, 5));          // 多字符单引号
+    CHECK(lexThrows("x = ''", 1, 5));            // 空字符字面量
 }
 
 #define RUN(t)                                                     \

@@ -312,9 +312,16 @@ namespace castam {
                     }
                 }
                 // HAM 0x03：'a' 是字符，"abc" 是字符串
-                // 多字符单引号宽容地按字符串处理，因为 HAM 0x08 写了 import('os')
-                TK kind = (quote == '\'' && value.size() == 1) ? TK::CharLit : TK::StrLit;
-                push(kind, value, startLine, startCol);
+                // 单引号字面量必须恰好一个字符，否则报词法错误
+                if (quote == '\'') {
+                    if (value.size() != 1) {
+                        error("character literal must contain exactly one character",
+                              startLine, startCol);
+                    }
+                    push(TK::CharLit, value, startLine, startCol);
+                } else {
+                    push(TK::StrLit, value, startLine, startCol);
+                }
             }
 
             // 反引号运算符名（HAM 0x07：运算符即函数，`` `+ `` 是把运算符
