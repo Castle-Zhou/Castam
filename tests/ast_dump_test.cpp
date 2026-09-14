@@ -44,7 +44,6 @@ static void testLiterals() {
     checkDump(makeNode(BoolLit{false}), "(bool false)");
     checkDump(id("x"), "(ident x)");
     checkDump(makeNode(Placeholder{}), "(placeholder)");
-    checkDump(makeNode(BacktickOp{"+"}), "(op +)");
 }
 
 // 组合与四种声明 pattern
@@ -56,12 +55,11 @@ static void testCombAndPatterns() {
     comb.items.push_back(decl(PatPath{"comb", {}, {"a", "b"}}, id("comb1")));
     comb.items.push_back(decl(PatPath{"comb", {"x"}, {"a"}}, num("3")));
     comb.items.push_back(decl(PatDestructure{{"x", "y"}}, id("comb")));
-    comb.items.push_back(decl(PatOp{"+"}, id("mul"), true));
     checkDump(makeNode(std::move(comb)),
               "(comb (decl x (int 1)) (decl (path comb x) (int 2))"
               " (decl (path comb {a b}) (ident comb1))"
               " (decl (path comb x {a}) (int 3))"
-              " (decl (destr x y) (ident comb)) (decl<- (op +) (ident mul)))");
+              " (decl (destr x y) (ident comb)))");
     checkDump(makeNode(CombLit{}), "(comb)");
 }
 

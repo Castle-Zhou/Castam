@@ -11,7 +11,7 @@ namespace castam {
         // 标识符与字面量
         Ident,      // [A-Za-z#][A-Za-z0-9_#]* | _[A-Za-z0-9_#]+
         Underscore, // 单独的 `_`（语法糖占位符）
-        BacktickOp, // `+`、`<|` 等被当作名字引用的运算符
+        Backtick,   // 裸 `` ` `` 定界符（HAM 0x01 的 `_` 语法糖定界，配对归 parser）
         IntLit,
         FloatLit,
         CharLit,

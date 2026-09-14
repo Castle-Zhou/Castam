@@ -110,8 +110,6 @@ namespace castam {
                         for (const auto &k : pat.keys)
                             out += " " + k;
                         out += ")";
-                    } else {
-                        out += "(op " + pat.name + ")";
                     }
                 },
                 p);
@@ -167,7 +165,6 @@ namespace castam {
             }
             void operator()(const Ident &v) { out += "(ident " + v.name + ")"; }
             void operator()(const Placeholder &) { out += "(placeholder)"; }
-            void operator()(const BacktickOp &v) { out += "(op " + v.name + ")"; }
 
             void operator()(const CombLit &v) {
                 out += "(comb";

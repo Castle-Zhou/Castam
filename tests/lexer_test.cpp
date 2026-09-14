@@ -139,13 +139,14 @@ static void testOperators() {
 }
 
 static void testBacktick() {
-    auto toks = castam::lex("`+` = `+` <| (a, b) => a");
-    CHECK(toks[0].kind == TK::BacktickOp && toks[0].text == "+");
-    CHECK(toks[1].kind == TK::Eq);
-    CHECK(toks[2].kind == TK::BacktickOp && toks[2].text == "+");
-    CHECK(toks[3].kind == TK::Delta);
-    toks = castam::lex("`<|` $ (a, b)");
-    CHECK(toks[0].kind == TK::BacktickOp && toks[0].text == "<|");
+    // 反引号是裸定界 token（HAM 0x01），成对嵌套与 `_` 检查归 parser
+    CHECK_KINDS("`_ + 1`", TK::Backtick, TK::Underscore, TK::Plus, TK::IntLit,
+                TK::Backtick);
+    CHECK_KINDS("`_ <| `_ + 1``", TK::Backtick, TK::Underscore, TK::Delta,
+                TK::Backtick, TK::Underscore, TK::Plus, TK::IntLit, TK::Backtick,
+                TK::Backtick);
+    // 字符串内的反引号不参与配对
+    CHECK_KINDS("\"`\"", TK::StrLit);
 }
 
 // 注释与行列号
@@ -244,7 +245,6 @@ static void testErrors() {
     CHECK(lexThrows("a = 'ab", 1, 5));           // 未闭合字符
     CHECK(lexThrows("x @ y", 1, 3));             // 非法字符
     CHECK(lexThrows("a .. b", 1, 3));            // `..`
-    CHECK(lexThrows("ok = 1,\nBAD = `+", 2, 7)); // 未闭合反引号（第 2 行）
     CHECK(lexThrows("x = \"a\\q\"", 1, 8));      // 未知转义（位于 q）
     CHECK(lexThrows("x = 'os'", 1, 5));          // 多字符单引号
     CHECK(lexThrows("x = ''", 1, 5));            // 空字符字面量

@@ -16,8 +16,8 @@ namespace castam {
             return "Ident";
         case TK::Underscore:
             return "Underscore";
-        case TK::BacktickOp:
-            return "BacktickOp";
+        case TK::Backtick:
+            return "Backtick";
         case TK::IntLit:
             return "IntLit";
         case TK::FloatLit:
@@ -324,23 +324,12 @@ namespace castam {
                 }
             }
 
-            // 反引号运算符名（HAM 0x07：运算符即函数，`` `+ `` 是把运算符
-            // 当作值引用或声明的写法）
+            // 反引号是 `_` 语法糖的范围定界符（HAM 0x01/0x07），只发裸 token；
+            // 成对嵌套与"对内至少一个 `_`"的判定需要试探解析，归 parser
             void lexBacktick() {
                 int startLine = line_, startCol = col_;
                 advance(); // '`'
-                size_t start = pos_;
-                while (!atEnd() && peek() != '`' && peek() != '\n')
-                    advance();
-                if (atEnd() || peek() == '\n') {
-                    error("unterminated backtick operator name", startLine, startCol);
-                }
-                std::string name = src_.substr(start, pos_ - start);
-                advance(); // 闭反引号
-                if (name.empty()) {
-                    error("empty backtick operator name", startLine, startCol);
-                }
-                push(TK::BacktickOp, name, startLine, startCol);
+                push(TK::Backtick, "`", startLine, startCol);
             }
 
             // 尝试在当前位置匹配 s；成功则消费它、压入 token 并返回 true

@@ -67,10 +67,7 @@ namespace castam {
     struct PatDestructure {
         std::vector<std::string> keys; // {x, y} = comb
     };
-    struct PatOp {
-        std::string name; // `+` = ...（HAM 0x07 的运算符声明）
-    };
-    using Pattern = std::variant<PatIdent, PatPath, PatDestructure, PatOp>;
+    using Pattern = std::variant<PatIdent, PatPath, PatDestructure>;
 
     // 组合中的一项声明：pattern = value 或 pattern <- value（HAM 0x01）
     struct Decl {
@@ -118,12 +115,8 @@ namespace castam {
     struct Ident {
         std::string name;
     };
-    // `_` 语法糖占位符（HAM 0x01），parser 在表达式边界把它包成 Lambda
+    // `_` 语法糖占位符（HAM 0x01），parser 在表达式边界或反引号定界处把它包成 Lambda
     struct Placeholder {};
-    // 反引号引用的运算符名（HAM 0x07）
-    struct BacktickOp {
-        std::string name;
-    };
 
     // 组合字面量 { x = 1, f <- ... }（HAM 0x00）
     // 源文件本身就是一个隐式的 CombLit
@@ -233,8 +226,8 @@ namespace castam {
     struct Node {
         SrcLoc loc;
         std::variant<IntLit, FloatLit, CharLit, StrLit, BoolLit, Ident, Placeholder,
-                     BacktickOp, CombLit, CombSet, EnumSet, PredSet, Lambda, Binary, As,
-                     Unary, IfExpr, TempComb, Proj, ContextProj, Index, ArrayType, Call,
+                     CombLit, CombSet, EnumSet, PredSet, Lambda, Binary, As, Unary,
+                     IfExpr, TempComb, Proj, ContextProj, Index, ArrayType, Call,
                      ArrayLit, StructLit, Spread, Typed>
             kind;
     };

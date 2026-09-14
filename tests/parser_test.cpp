@@ -1,5 +1,5 @@
 // parser 的快照测试：HAM 代码片段 → 期望的 S 表达式
-// 覆盖优先级表、{} 四形态、pattern、lambda 全形态、`_` 糖、as、
+// 覆盖优先级表、{} 四形态、pattern、lambda 全形态、`_` 糖与反引号范围、as、
 // let/where、if、调用族、参数包，以及若干语法错误
 
 #include <iostream>
@@ -82,8 +82,6 @@ static void testBracesAndPatterns() {
     P("comb.x = 2", "(decl (path comb x) (int 2))");
     P("comb.{a, b} = c", "(decl (path comb {a b}) (ident c))");
     P("{x, y} = comb", "(decl (destr x y) (ident comb))");
-    P("`+` = (a, b) => a * b", "(decl (op +) (lambda (a b) (* (ident a) (ident b))))");
-    P("r = `+`(a, b)", "(decl r (call (op +) (ident a) (ident b)))");
 
     // 逗号可选（HAM 0x00）
     P("x = 1 y = 2", "(decl x (int 1)) (decl y (int 2))");
@@ -124,6 +122,30 @@ static void testSugarAndAs() {
       "(decl y (as (comb (decl x (int 1))) (combset (field x (ident Int)))))");
     // as 左侧的 `_` 先包成糖 lambda，类型标注作用于整个函数
     P("inc = _ + 1 as Int -> Int",
+      "(decl inc (as (lambda* (_) (+ (placeholder) (int 1))) (-> (ident Int) (ident Int))))");
+}
+
+// 反引号 `_` 范围（HAM 0x01）：显式定界的单参糖 lambda
+
+static void testBacktickScope() {
+    P("inc = `_ + 1`", "(decl inc (lambda* (_) (+ (placeholder) (int 1))))");
+    // 嵌套：内层 `_` 绑定内层（HAM 0x01 的 xAndInc 示例）
+    P("xAndInc = `_ <| `_ + 1``",
+      "(decl xAndInc (lambda* (_) (<| (placeholder) (lambda* (_) (+ (placeholder) (int 1))))))");
+    // 对内多个 `_` 绑同一个参数（与裸写法的逐元素包装不同）
+    P("r = 2 |> `legs(_, _)`",
+      "(decl r (|> (int 2) (lambda* (_) (call (ident legs) (placeholder) (placeholder)))))");
+    P("f = Array.flatMap(arr2, `[_, -_]`)",
+      "(decl f (call (. (ident Array) flatMap) (ident arr2)"
+      " (lambda* (_) (array (placeholder) (neg (placeholder))))))");
+    P("r = arr2 |> `map(_, `_ * 2`)`",
+      "(decl r (|> (ident arr2)"
+      " (lambda* (_) (call (ident map) (placeholder) (lambda* (_) (* (placeholder) (int 2)))))))");
+    P("Odd = {...| `_ % 2 == 1` }",
+      "(decl Odd (predset (lambda* (_) (== (% (placeholder) (int 2)) (int 1)))))");
+    // scope 是 primary，可接后缀；as 作用于整个函数（HAM 0x03）
+    P("y = `_+1` $ (3)", "(decl y (call$ (lambda* (_) (+ (placeholder) (int 1))) (int 3)))");
+    P("inc = `_ + 1` as Int -> Int",
       "(decl inc (as (lambda* (_) (+ (placeholder) (int 1))) (-> (ident Int) (ident Int))))");
 }
 
@@ -168,6 +190,8 @@ static void testErrors() {
     checkError("f = (1) => 2");          // 非法参数列表
     checkError("x = (1 + 2");            // 未闭合括号
     checkError("_ = 1");                 // _ 不能作为键名（HAM 0x00）
+    checkError("x = `_ + 1");            // 未闭合的反引号
+    checkError("x = `f(x)`");            // 反引号对内没有 `_`
 }
 
 int main() {
@@ -175,6 +199,7 @@ int main() {
     testBracesAndPatterns();
     testLambdas();
     testSugarAndAs();
+    testBacktickScope();
     testTempCombAndIf();
     testCallsAndPostfix();
     testErrors();
