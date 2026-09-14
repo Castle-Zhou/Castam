@@ -138,6 +138,25 @@ static void testOperators() {
                 TK::Percent, TK::Gt, TK::Ge);
 }
 
+// `#` 运算符名（HAM 0x07）
+
+static void testHashOps() {
+    CHECK_KINDS("#+ = #+ <| (a, b) => a * b", TK::OpName, TK::Eq, TK::OpName,
+                TK::Delta, TK::LParen, TK::Ident, TK::Comma, TK::Ident,
+                TK::RParen, TK::FatArrow, TK::Ident, TK::Star, TK::Ident);
+    // 贪婪聚合：连续的符号字符成一个 OpName（文本保留源码原文，含 `#`）
+    auto toks = castam::lex("#<=> #+ #<| #|> #++ #<=>= #fixedSizeArr ## #");
+    CHECK(toks[0].kind == TK::OpName && toks[0].text == "#<=>");
+    CHECK(toks[1].kind == TK::OpName && toks[1].text == "#+");
+    CHECK(toks[2].kind == TK::OpName && toks[2].text == "#<|");
+    CHECK(toks[3].kind == TK::OpName && toks[3].text == "#|>");
+    CHECK(toks[4].kind == TK::OpName && toks[4].text == "#++");
+    CHECK(toks[5].kind == TK::OpName && toks[5].text == "#<=>=");
+    CHECK(toks[6].kind == TK::Ident && toks[6].text == "#fixedSizeArr");
+    CHECK(toks[7].kind == TK::Ident && toks[7].text == "##");
+    CHECK(toks[8].kind == TK::Ident && toks[8].text == "#");
+}
+
 static void testBacktick() {
     // 反引号是裸定界 token（HAM 0x01），成对嵌套与 `_` 检查归 parser
     CHECK_KINDS("`_ + 1`", TK::Backtick, TK::Underscore, TK::Plus, TK::IntLit,
@@ -266,6 +285,7 @@ int main() {
     RUN(testNumbers);
     RUN(testStrings);
     RUN(testOperators);
+    RUN(testHashOps);
     RUN(testBacktick);
     RUN(testCommentsAndPositions);
     RUN(testSumHamSnippet);

@@ -18,6 +18,8 @@ namespace castam {
             return "Underscore";
         case TK::Backtick:
             return "Backtick";
+        case TK::OpName:
+            return "OpName";
         case TK::IntLit:
             return "IntLit";
         case TK::FloatLit:
@@ -136,6 +138,29 @@ namespace castam {
         // 键名的后续字符：首字符集加上数字
         bool isIdentCont(char c) { return isIdentStart(c) || (c >= '0' && c <= '9'); }
 
+        // `#` 后的运算符符号字符集（HAM 0x07）：取现有运算符用到的符号字符，
+        // 供 `#+`、`#<=>` 这类算子名贪婪聚合
+        bool isOperatorSymbolChar(char c) {
+            switch (c) {
+            case '+':
+            case '-':
+            case '*':
+            case '/':
+            case '%':
+            case '<':
+            case '>':
+            case '=':
+            case '!':
+            case '&':
+            case '|':
+            case '~':
+            case '$':
+                return true;
+            default:
+                return false;
+            }
+        }
+
         // 只把有语法角色的词列为关键字（实现决策：文档里 import 和内置集合名
         // 没有特殊语法地位，按普通标识符处理）
         TK keywordKind(const std::string &s) {
@@ -170,7 +195,9 @@ namespace castam {
                     if (atEnd())
                         break;
                     char c = peek();
-                    if (isIdentStart(c)) {
+                    if (c == '#' && isOperatorSymbolChar(peek(1))) {
+                        lexOpName();
+                    } else if (isIdentStart(c)) {
                         lexIdent();
                     } else if (c >= '0' && c <= '9') {
                         lexNumber();
@@ -244,6 +271,18 @@ namespace castam {
                 } else {
                     push(keywordKind(text), text, startLine, startCol);
                 }
+            }
+
+            // `#` + 运算符符号（HAM 0x07）：贪婪吃下连续符号字符，聚合为一个
+            // OpName（文本含 `#`），如 `#+`、`#<|`、`#<=>`。词法只负责成词，
+            // 该符号能不能被引用（白名单）由 parser 把关
+            void lexOpName() {
+                int startLine = line_, startCol = col_;
+                size_t start = pos_;
+                advance(); // '#'
+                while (!atEnd() && isOperatorSymbolChar(peek()))
+                    advance();
+                push(TK::OpName, src_.substr(start, pos_ - start), startLine, startCol);
             }
 
             // 数字字面量：整数与小数

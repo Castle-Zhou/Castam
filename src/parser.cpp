@@ -110,6 +110,20 @@ namespace castam {
             }
         }
 
+        // `#` 可引用的符号运算符（HAM 0x07 表 4/6-12 级的符号）；
+        // `$`、`.` 等调用族语法与 `=`、`<-`、`=>`、`->` 声明符不可引用。
+        // 扩展自定义运算符前，白名单只放行这一张表
+        bool isKnownOpName(const std::string &s) {
+            static const char *const kNames[] = {
+                "|>", "<|", "<~", "||", "&&", "|",  "&",  "==", "!=", "<",
+                ">",  "<=", ">=", "+",  "-",  "*",  "/",  "%",  "!",  "~",
+            };
+            for (const char *n : kNames)
+                if (s == n)
+                    return true;
+            return false;
+        }
+
         class Parser {
         public:
             explicit Parser(const std::vector<Token> &toks) : toks_(toks) {}
@@ -210,6 +224,10 @@ namespace castam {
             // 失败时不消费任何 token；调用方若发现后面没有 =/<-/: 需自行回退
             bool tryParsePattern(Pattern &out) {
                 size_t save = i_;
+                if (at(TK::OpName)) {
+                    out = PatOp{opName(advance())};
+                    return true;
+                }
                 if (at(TK::Ident)) {
                     std::string base = advance().text;
                     PatPath path{base, {}, {}};
@@ -327,12 +345,13 @@ namespace castam {
                         continue;
                     }
                     // ->（6 级，右结合）：函数集合类型（HAM 0x02）
-                    // 右侧经 parseType 递归吃 ->，lambda 返回值标注在 makeLambda 里拆出
+                    // 右侧经 parseArrowType 递归吃 ->，lambda 返回值标注在 makeLambda 里拆出；
+                    // 右侧不吃 as，保证 `A -> B as C` 按优先级解析为 `(A -> B) as C`
                     if (at(TK::ThinArrow)) {
                         if (6 < minBp)
                             break;
                         Token arrow = advance();
-                        e = makeNode(Binary{BinOp::Arrow, std::move(e), parseType()},
+                        e = makeNode(Binary{BinOp::Arrow, std::move(e), parseArrowType()},
                                      loc(arrow));
                         continue;
                     }
@@ -383,6 +402,15 @@ namespace castam {
                 return e;
             }
 
+            // `#op`（TK::OpName）：词法已贪婪成词，这里只做白名单校验（HAM 0x07），
+            // 暂不支持自定义新运算符
+            std::string opName(const Token &t) const {
+                std::string name = t.text.substr(1); // 去掉 '#'
+                if (!isKnownOpName(name))
+                    error("不支持的运算符 `" + t.text + "`", t.line, t.col);
+                return name;
+            }
+
             NodePtr parsePrefix() {
                 Token t = peek();
                 switch (t.kind) {
@@ -431,6 +459,10 @@ namespace castam {
                     return makeNode(Placeholder{}, loc(t));
                 case TK::Backtick:
                     return parseBacktickScope();
+                case TK::OpName: {
+                    Token op = advance();
+                    return makeNode(OpRef{opName(op)}, loc(op));
+                }
                 case TK::KwIf:
                     return parseIf();
                 case TK::KwLet:
@@ -521,11 +553,23 @@ namespace castam {
             }
 
             // 类型/集合表达式（HAM 0x02/0x03）：允许 -> 右结合，停于 => , ) } >
+            // as（2 级）与表达式层一致，松于 ->（6 级）：`A -> B as C` = `(A -> B) as C`
             NodePtr parseType() {
+                NodePtr t = parseArrowType();
+                if (at(TK::KwAs)) {
+                    Token a = advance();
+                    t = makeNode(As{wrapIfPlaceholder(std::move(t)), parseType()}, loc(a));
+                }
+                return t;
+            }
+
+            // -> 链（6 级，右结合）：类型位置的 as 由 parseType 在其外统一处理
+            NodePtr parseArrowType() {
                 NodePtr t = parseExpr(7);
                 if (at(TK::ThinArrow)) {
                     Token arrow = advance();
-                    t = makeNode(Binary{BinOp::Arrow, std::move(t), parseType()}, loc(arrow));
+                    t = makeNode(Binary{BinOp::Arrow, std::move(t), parseArrowType()},
+                                 loc(arrow));
                 }
                 return t;
             }
@@ -758,6 +802,7 @@ namespace castam {
             static bool anyChildPlaceholder(const StrLit &) { return false; }
             static bool anyChildPlaceholder(const BoolLit &) { return false; }
             static bool anyChildPlaceholder(const Ident &) { return false; }
+            static bool anyChildPlaceholder(const OpRef &) { return false; }
             static bool anyChildPlaceholder(const Placeholder &) { return true; }
             static bool anyChildPlaceholder(const CombLit &v) {
                 for (const auto &d : v.items)

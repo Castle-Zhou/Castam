@@ -67,7 +67,10 @@ namespace castam {
     struct PatDestructure {
         std::vector<std::string> keys; // {x, y} = comb
     };
-    using Pattern = std::variant<PatIdent, PatPath, PatDestructure>;
+    struct PatOp {
+        std::string name; // `#+` = ...（HAM 0x07 的运算符声明）
+    };
+    using Pattern = std::variant<PatIdent, PatPath, PatDestructure, PatOp>;
 
     // 组合中的一项声明：pattern = value 或 pattern <- value（HAM 0x01）
     struct Decl {
@@ -113,6 +116,11 @@ namespace castam {
     };
 
     struct Ident {
+        std::string name;
+    };
+    // `#+` 算子引用（HAM 0x07）：取算符对应的函数值，可调用、可扩展
+    // name 不含 `#`；能不能被引用由 parser 白名单把关
+    struct OpRef {
         std::string name;
     };
     // `_` 语法糖占位符（HAM 0x01），parser 在表达式边界或反引号定界处把它包成 Lambda
@@ -225,10 +233,10 @@ namespace castam {
 
     struct Node {
         SrcLoc loc;
-        std::variant<IntLit, FloatLit, CharLit, StrLit, BoolLit, Ident, Placeholder,
-                     CombLit, CombSet, EnumSet, PredSet, Lambda, Binary, As, Unary,
-                     IfExpr, TempComb, Proj, ContextProj, Index, ArrayType, Call,
-                     ArrayLit, StructLit, Spread, Typed>
+        std::variant<IntLit, FloatLit, CharLit, StrLit, BoolLit, Ident, OpRef,
+                     Placeholder, CombLit, CombSet, EnumSet, PredSet, Lambda, Binary,
+                     As, Unary, IfExpr, TempComb, Proj, ContextProj, Index, ArrayType,
+                     Call, ArrayLit, StructLit, Spread, Typed>
             kind;
     };
 

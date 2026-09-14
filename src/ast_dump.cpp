@@ -110,6 +110,8 @@ namespace castam {
                         for (const auto &k : pat.keys)
                             out += " " + k;
                         out += ")";
+                    } else if constexpr (std::is_same_v<T, PatOp>) {
+                        out += "(op " + pat.name + ")";
                     }
                 },
                 p);
@@ -164,6 +166,7 @@ namespace castam {
                 out += v.value ? "(bool true)" : "(bool false)";
             }
             void operator()(const Ident &v) { out += "(ident " + v.name + ")"; }
+            void operator()(const OpRef &v) { out += "(op " + v.name + ")"; }
             void operator()(const Placeholder &) { out += "(placeholder)"; }
 
             void operator()(const CombLit &v) {

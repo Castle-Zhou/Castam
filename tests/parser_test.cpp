@@ -123,6 +123,15 @@ static void testSugarAndAs() {
     // as 左侧的 `_` 先包成糖 lambda，类型标注作用于整个函数
     P("inc = _ + 1 as Int -> Int",
       "(decl inc (as (lambda* (_) (+ (placeholder) (int 1))) (-> (ident Int) (ident Int))))");
+    // 类型位置同样允许 as（HAM 0x03）：as Set 吃到组合面、留下集合值面
+    P("Env = { q: Heap(Pair(Int, Int)) as Set }",
+      "(decl Env (combset (field q (as (call (ident Heap) (call (ident Pair) (ident Int)"
+      " (ident Int))) (ident Set)))))");
+    // as 松于 ->（HAM 0x07）：`A -> B as C` = `(A -> B) as C`，类型位置与表达式层一致
+    P("Env = { q: Int -> Int as Set }",
+      "(decl Env (combset (field q (as (-> (ident Int) (ident Int)) (ident Set)))))");
+    P("x = Int -> Int as Set",
+      "(decl x (as (-> (ident Int) (ident Int)) (ident Set)))");
 }
 
 // 反引号 `_` 范围（HAM 0x01）：显式定界的单参糖 lambda
@@ -147,6 +156,20 @@ static void testBacktickScope() {
     P("y = `_+1` $ (3)", "(decl y (call$ (lambda* (_) (+ (placeholder) (int 1))) (int 3)))");
     P("inc = `_ + 1` as Int -> Int",
       "(decl inc (as (lambda* (_) (+ (placeholder) (int 1))) (-> (ident Int) (ident Int))))");
+}
+
+// `#` 运算符名（HAM 0x07）：白名单内的符号转成算子引用/声明目标
+
+static void testOperatorRefs() {
+    P("#+ = (a, b) => a * b",
+      "(decl (op +) (lambda (a b) (* (ident a) (ident b))))");
+    P("#+ <- (a, b) => a + b", "(decl<- (op +) (lambda (a b) (+ (ident a) (ident b))))");
+    P("x = #+(a, b)", "(decl x (call (op +) (ident a) (ident b)))");
+    P("#+ = #+ <| (a, b) => a",
+      "(decl (op +) (<| (op +) (lambda (a b) (ident a))))");
+    // 其余有符号运算符同样可引用
+    P("r = [#<|, #|>, #<~, #<=, #!]",
+      "(decl r (array (op <|) (op |>) (op <~) (op <=) (op !)))");
 }
 
 // let in / where / if（HAM 0x01/0x02）
@@ -192,6 +215,10 @@ static void testErrors() {
     checkError("_ = 1");                 // _ 不能作为键名（HAM 0x00）
     checkError("x = `_ + 1");            // 未闭合的反引号
     checkError("x = `f(x)`");            // 反引号对内没有 `_`
+    checkError("#<=> = (a, b) => a");    // 白名单外的新运算符
+    checkError("x = #<=>(a, b)");        // 同上
+    checkError("x = #$");                // `$` 是调用语法，不可引用
+    checkError("#=> = (a, b) => a");      // 箭头/声明符不可引用
 }
 
 int main() {
@@ -200,6 +227,7 @@ int main() {
     testLambdas();
     testSugarAndAs();
     testBacktickScope();
+    testOperatorRefs();
     testTempCombAndIf();
     testCallsAndPostfix();
     testErrors();
