@@ -193,6 +193,8 @@ namespace castam {
             int parenDepth_ = 0;  // 括号嵌套深度，用于判断 x: T 标注是否合法
             int exprDepth_ = 0;   // parseExpr 递归深度（B2 护栏，ExprDepthGuard 维护）
             bool stopGt_ = false; // 解析泛型约束时把 > 视为终止符
+            // 解析 -> 类型链时把 => 视为外层参数列表的分隔符（HAM 0x02），不成 λ
+            bool stopFatArrow_ = false;
 
             // 组合/集合内的一项：声明、组合集合字段或表达式（枚举集合元素）
             struct Item {
@@ -374,6 +376,12 @@ namespace castam {
                     throw GuardError("表达式嵌套过深（上限 128）", peek().line,
                                      peek().col);
                 NodePtr e = parsePrefix();
+                // 参数列表是受限文法：后面紧跟 => 时优先成 λ（HAM 0x06 的
+                // arr2 | x => x > 1；优先于任何中缀判定。LHS 含 -> 返回标注的
+                // 形态不由这里处理，仍走主循环的 => 分支）
+                // 例外：-> 类型链内（stopFatArrow_），=> 是外层参数列表的分隔符
+                if (!stopFatArrow_ && at(TK::FatArrow))
+                    e = makeLambda(std::move(e), advance());
                 int chainLen = 0;
                 while (true) {
                     // 链长护栏（B2）：扁平长链会造出过深的左偏树，析构/dump 时爆栈
@@ -618,13 +626,18 @@ namespace castam {
             }
 
             // -> 链（6 级，右结合）：类型位置的 as 由 parseType 在其外统一处理
+            // -> 的右侧是类型片段：其中的 => 属于外层参数列表（HAM 0x02），
+            // 解析期间置 stopFatArrow_，防止它被提前折成 λ
             NodePtr parseArrowType() {
+                bool saveStopFatArrow = stopFatArrow_;
+                stopFatArrow_ = true;
                 NodePtr t = parseExpr(7);
                 if (at(TK::ThinArrow)) {
                     Token arrow = advance();
                     t = makeNode(Binary{BinOp::Arrow, std::move(t), parseArrowType()},
                                  loc(arrow));
                 }
+                stopFatArrow_ = saveStopFatArrow;
                 return t;
             }
 

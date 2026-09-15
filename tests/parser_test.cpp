@@ -125,6 +125,11 @@ static void testLambdas() {
     P("f = ({ x: { 1 } }) => x",
       "(decl f (lambda ((destr (x (enum (int 1))))) (ident x)))");
     P("f = ({x, y}, z) => x", "(decl f (lambda ((destr x y) z) (ident x)))");
+    // λ 的参数列表优先于中缀运算符解析（HAM 0x06 的过滤器写法；HAM 0x07 的 5/8 档）
+    P("a = arr2 | x => x > 1",
+      "(decl a (| (ident arr2) (lambda (x) (> (ident x) (int 1)))))");
+    // 副作用（预期）：比 => 紧的算符右侧可直接接裸 λ
+    P("f = a && x => x", "(decl f (&& (ident a) (lambda (x) (ident x))))");
 }
 
 // `_` 糖与 as（HAM 0x01/0x02）
