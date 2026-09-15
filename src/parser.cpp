@@ -41,6 +41,111 @@ namespace castam {
             return false;
         }
 
+        // 病态输入护栏（B2）：递归下降/左偏树过深会爆栈（SIGSEGV），超限改为干净报错
+        static constexpr int kMaxNestDepth = 128; // 语法嵌套上限
+        static constexpr int kMaxChainLen = 128;  // 单个表达式的运算符链长上限
+
+        // 护栏触发的错误：与候选试探的回溯信号区分开——反引号候选循环靠捕获
+        // ParseError 逐候选重试，护栏错误是病态输入的终态，必须直接传播
+        struct GuardError: ParseError {
+            using ParseError::ParseError;
+        };
+
+        // parseExpr 入口的深度计数：括号/组合/数组/反引号/一元/-> 等所有嵌套来源
+        // 都经由 parseExpr，一个计数器全覆盖
+        struct ExprDepthGuard {
+            int &depth;
+            explicit ExprDepthGuard(int &d) : depth(d) { ++depth; }
+            ~ExprDepthGuard() { --depth; }
+        };
+
+        // 通用子节点访问器（B2 的基础设施）：对 n 的每个直接子 Node 调用 fn(const Node&)
+        // 覆盖 Node::kind 的全部 25 个分支；可空的 NodePtr 先判空；叶子无子节点
+        template <typename F>
+        void forEachChild(const Node &n, F &&fn) {
+            auto each = [&](const NodePtr &p) {
+                if (p)
+                    fn(*p);
+            };
+            std::visit(
+                [&](const auto &v) {
+                    using T = std::decay_t<decltype(v)>;
+                    if constexpr (std::is_same_v<T, CombLit>) {
+                        for (const auto &d : v.items)
+                            each(d.value);
+                    } else if constexpr (std::is_same_v<T, CombSet>) {
+                        for (const auto &f : v.fields)
+                            each(f.type);
+                    } else if constexpr (std::is_same_v<T, EnumSet> ||
+                                         std::is_same_v<T, ArrayLit> ||
+                                         std::is_same_v<T, StructLit>) {
+                        for (const auto &p : v.elems)
+                            each(p);
+                    } else if constexpr (std::is_same_v<T, PredSet>) {
+                        each(v.pred);
+                    } else if constexpr (std::is_same_v<T, Lambda>) {
+                        for (const auto &g : v.generics)
+                            each(g.bound);
+                        for (const auto &p : v.params)
+                            each(p.type);
+                        each(v.returnType);
+                        each(v.body);
+                    } else if constexpr (std::is_same_v<T, Binary>) {
+                        each(v.lhs);
+                        each(v.rhs);
+                    } else if constexpr (std::is_same_v<T, As>) {
+                        each(v.expr);
+                        each(v.type);
+                    } else if constexpr (std::is_same_v<T, Unary> ||
+                                         std::is_same_v<T, Spread>) {
+                        each(v.expr);
+                    } else if constexpr (std::is_same_v<T, Proj>) {
+                        each(v.obj);
+                    } else if constexpr (std::is_same_v<T, ArrayType>) {
+                        each(v.elem);
+                    } else if constexpr (std::is_same_v<T, IfExpr>) {
+                        each(v.cond);
+                        each(v.thenBranch);
+                        each(v.elseBranch);
+                    } else if constexpr (std::is_same_v<T, TempComb>) {
+                        each(v.comb);
+                        each(v.body);
+                    } else if constexpr (std::is_same_v<T, Index>) {
+                        each(v.obj);
+                        each(v.index);
+                    } else if constexpr (std::is_same_v<T, Call>) {
+                        each(v.callee);
+                        for (const auto &a : v.args)
+                            each(a);
+                    } else if constexpr (std::is_same_v<T, Typed>) {
+                        each(v.expr);
+                        each(v.type);
+                    }
+                    // IntLit/FloatLit/CharLit/StrLit/BoolLit/Ident/OpRef/Placeholder/
+                    // ContextProj 是叶子，无子节点
+                },
+                n.kind);
+        }
+
+        // 子树是否含自由 `_`（HAM 0x01）：迭代版（显式栈，不递归，B2）
+        // 糖 lambda 的 `_` 已被绑定，不下潜其 body；非糖 lambda 只看 body
+        bool hasFreePlaceholder(const Node &root) {
+            std::vector<const Node *> stack{&root};
+            while (!stack.empty()) {
+                const Node *n = stack.back();
+                stack.pop_back();
+                if (std::holds_alternative<Placeholder>(n->kind))
+                    return true;
+                if (auto *lam = std::get_if<Lambda>(&n->kind)) {
+                    if (!lam->sugar)
+                        stack.push_back(lam->body.get());
+                    continue;
+                }
+                forEachChild(*n, [&](const Node &c) { stack.push_back(&c); });
+            }
+            return false;
+        }
+
         class Parser {
         public:
             explicit Parser(const std::vector<Token> &toks) : toks_(toks) {}
@@ -63,6 +168,7 @@ namespace castam {
             const std::vector<Token> &toks_;
             size_t i_ = 0;
             int parenDepth_ = 0;         // 括号嵌套深度，用于判断 x: T 标注是否合法
+            int exprDepth_ = 0;          // parseExpr 递归深度（B2 护栏，ExprDepthGuard 维护）
             bool stopGt_ = false;        // 解析泛型约束时把 > 视为终止符
             bool suppressSugar_ = false; // 反引号对内抑制隐式 `_` 包装（HAM 0x01）
 
@@ -225,8 +331,18 @@ namespace castam {
             // 而比较/算术/前缀运算的操作数不提前包裹
             // 反引号对内由 suppressSugar_ 抑制，改在闭反引号处统一包裹
             NodePtr parseExpr(int minBp) {
+                // 深度护栏（B2）：嵌套超限抛 ParseError 而不是递归爆栈
+                ExprDepthGuard depthGuard{exprDepth_};
+                if (exprDepth_ > kMaxNestDepth)
+                    throw GuardError("表达式嵌套过深（上限 128）", peek().line,
+                                     peek().col);
                 NodePtr e = parsePrefix();
+                int chainLen = 0;
                 while (true) {
+                    // 链长护栏（B2）：扁平长链会造出过深的左偏树，析构/dump 时爆栈
+                    if (++chainLen > kMaxChainLen)
+                        throw GuardError("单个表达式的运算符链过长（上限 128）",
+                                         peek().line, peek().col);
                     // 后缀（14 级，最紧）：.x、[i]、[]、(...)
                     if (at(TK::Dot)) {
                         Token dot = advance();
@@ -446,6 +562,8 @@ namespace castam {
                     NodePtr content;
                     try {
                         content = parseExpr(1);
+                    } catch (const GuardError &) {
+                        throw; // 护栏错误是终态，不作为候选失败重试
                     } catch (const ParseError &) {
                         content = nullptr;
                     }
@@ -686,96 +804,6 @@ namespace castam {
                 if (suppressSugar_ || !hasFreePlaceholder(*e))
                     return e;
                 return wrapSugar(std::move(e));
-            }
-
-            static bool hasFreePlaceholder(const Node &n) {
-                return std::visit(
-                    [](const auto &v) {
-                        using T = std::decay_t<decltype(v)>;
-                        if constexpr (std::is_same_v<T, Placeholder>) {
-                            return true;
-                        } else if constexpr (std::is_same_v<T, Lambda>) {
-                            // 糖 lambda 的 `_` 已被绑定，不再向外泄露
-                            if (v.sugar)
-                                return false;
-                            return hasFreePlaceholder(*v.body);
-                        } else {
-                            return anyChildPlaceholder(v);
-                        }
-                    },
-                    n.kind);
-            }
-
-            // 检查各节点种类的直接子节点（Lambda/Placeholder 已在上面特判）
-            static bool anyOf(const std::vector<NodePtr> &v) {
-                for (const auto &p : v)
-                    if (hasFreePlaceholder(*p))
-                        return true;
-                return false;
-            }
-            static bool anyChildPlaceholder(const IntLit &) { return false; }
-            static bool anyChildPlaceholder(const FloatLit &) { return false; }
-            static bool anyChildPlaceholder(const CharLit &) { return false; }
-            static bool anyChildPlaceholder(const StrLit &) { return false; }
-            static bool anyChildPlaceholder(const BoolLit &) { return false; }
-            static bool anyChildPlaceholder(const Ident &) { return false; }
-            static bool anyChildPlaceholder(const OpRef &) { return false; }
-            static bool anyChildPlaceholder(const Placeholder &) { return true; }
-            static bool anyChildPlaceholder(const CombLit &v) {
-                for (const auto &d : v.items)
-                    if (hasFreePlaceholder(*d.value))
-                        return true;
-                return false;
-            }
-            static bool anyChildPlaceholder(const CombSet &v) {
-                for (const auto &f : v.fields)
-                    if (hasFreePlaceholder(*f.type))
-                        return true;
-                return false;
-            }
-            static bool anyChildPlaceholder(const EnumSet &v) { return anyOf(v.elems); }
-            static bool anyChildPlaceholder(const PredSet &v) {
-                return hasFreePlaceholder(*v.pred);
-            }
-            static bool anyChildPlaceholder(const Lambda &v) {
-                return hasFreePlaceholder(*v.body);
-            }
-            static bool anyChildPlaceholder(const Binary &v) {
-                return hasFreePlaceholder(*v.lhs) || hasFreePlaceholder(*v.rhs);
-            }
-            static bool anyChildPlaceholder(const As &v) {
-                return hasFreePlaceholder(*v.expr) || hasFreePlaceholder(*v.type);
-            }
-            static bool anyChildPlaceholder(const Unary &v) {
-                return hasFreePlaceholder(*v.expr);
-            }
-            static bool anyChildPlaceholder(const IfExpr &v) {
-                return hasFreePlaceholder(*v.cond) || hasFreePlaceholder(*v.thenBranch) ||
-                       (v.elseBranch && hasFreePlaceholder(*v.elseBranch));
-            }
-            static bool anyChildPlaceholder(const TempComb &v) {
-                return hasFreePlaceholder(*v.comb) || hasFreePlaceholder(*v.body);
-            }
-            static bool anyChildPlaceholder(const Proj &v) {
-                return hasFreePlaceholder(*v.obj);
-            }
-            static bool anyChildPlaceholder(const ContextProj &) { return false; }
-            static bool anyChildPlaceholder(const Index &v) {
-                return hasFreePlaceholder(*v.obj) || hasFreePlaceholder(*v.index);
-            }
-            static bool anyChildPlaceholder(const ArrayType &v) {
-                return hasFreePlaceholder(*v.elem);
-            }
-            static bool anyChildPlaceholder(const Call &v) {
-                return hasFreePlaceholder(*v.callee) || anyOf(v.args);
-            }
-            static bool anyChildPlaceholder(const ArrayLit &v) { return anyOf(v.elems); }
-            static bool anyChildPlaceholder(const StructLit &v) { return anyOf(v.elems); }
-            static bool anyChildPlaceholder(const Spread &v) {
-                return hasFreePlaceholder(*v.expr);
-            }
-            static bool anyChildPlaceholder(const Typed &v) {
-                return hasFreePlaceholder(*v.expr) || hasFreePlaceholder(*v.type);
             }
         };
 

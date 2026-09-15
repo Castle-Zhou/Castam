@@ -254,6 +254,40 @@ static void testErrors() {
     checkError("#=> = (a, b) => a");     // 箭头/声明符不可引用
 }
 
+// 病态输入护栏（B2）：深嵌套/扁平长链必须干净抛 ParseError，不能崩溃/挂死
+
+static std::string rep(const std::string &s, int n) {
+    std::string r;
+    for (int i = 0; i < n; ++i)
+        r += s;
+    return r;
+}
+
+static void testGuards() {
+    // 文档 4.3 的 6 个崩溃输入（原 SIGSEGV）
+    checkError("x = " + std::string(5000, '-') + "1"); // 一元负号 5000 层
+    checkError("x = " + std::string(5000, '(') + "1" + std::string(5000, ')'));
+    checkError("x = " + rep("{a=", 5000) + "1" + rep("}", 5000)); // 组合 5000 层
+    checkError("x = " + std::string(5000, '[') + std::string(5000, ']'));
+    checkError("x = " + std::string(5000, '`')); // 反引号 5000 个
+    checkError("x = a" + rep(" <| a", 7999));    // 扁平 <| 链 8000 项
+    // 最坏组合：128 层嵌套 × 每层 128 项链 → 干净报错、不崩
+    checkError("x = " + std::string(128, '(') + ("a" + rep(" <| a", 127)) +
+               std::string(128, ')'));
+    // 回归：5 万条顶层声明（不是长链）必须线性通过、不被护栏误伤
+    {
+        std::string src;
+        for (int i = 0; i < 50000; ++i)
+            src += "x" + std::to_string(i) + " = 1\n";
+        try {
+            parse(lex(src));
+        } catch (const std::exception &e) {
+            std::cerr << "many_items_50k threw: " << e.what() << '\n';
+            ++g_failures;
+        }
+    }
+}
+
 int main() {
     testPrecedence();
     testBracesAndPatterns();
@@ -265,6 +299,7 @@ int main() {
     testTempCombAndIf();
     testCallsAndPostfix();
     testErrors();
+    testGuards();
 
     if (g_failures == 0) {
         std::cout << "parser_test: all tests passed\n";
