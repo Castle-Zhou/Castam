@@ -3,6 +3,8 @@
 #include <functional>
 #include <utility>
 
+#include "op_table.h"
+
 // HAM 3.0 的 Pratt parser
 // 绑定力表来自 HAM 0x07 附录（14 级），特殊构造的解析决策标在各函数上
 
@@ -13,113 +15,28 @@ namespace castam {
 
     namespace {
 
-        // 中缀二元运算符的绑定力（HAM 0x07 附录）
+        // 中缀二元运算符的绑定力：查 op_table.h 的 kBinOps（HAM 0x07 附录）
         // =>、->、$、where、as 不在此表，它们在 parseExpr 主循环里单独处理
         bool infixBinOp(TK k, BinOp &op, int &level) {
-            switch (k) {
-            case TK::KwIs:
-                op = BinOp::Is;
-                level = 2;
-                return true;
-            case TK::KwIsnt:
-                op = BinOp::Isnt;
-                level = 2;
-                return true;
-            case TK::KwSubseteq:
-                op = BinOp::Subseteq;
-                level = 2;
-                return true;
-            case TK::KwSubset:
-                op = BinOp::Subset;
-                level = 2;
-                return true;
-            case TK::Pipe:
-                op = BinOp::Pipe;
-                level = 4;
-                return true;
-            case TK::Delta:
-                op = BinOp::Delta;
-                level = 5;
-                return true;
-            case TK::SetExt:
-                op = BinOp::SetExt;
-                level = 5;
-                return true;
-            case TK::OrOr:
-                op = BinOp::Or;
-                level = 7;
-                return true;
-            case TK::AndAnd:
-                op = BinOp::And;
-                level = 8;
-                return true;
-            case TK::Bar:
-                op = BinOp::Bar;
-                level = 9;
-                return true;
-            case TK::Amp:
-                op = BinOp::Amp;
-                level = 9;
-                return true;
-            case TK::EqEq:
-                op = BinOp::Eq;
-                level = 10;
-                return true;
-            case TK::NotEq:
-                op = BinOp::NotEq;
-                level = 10;
-                return true;
-            case TK::Lt:
-                op = BinOp::Lt;
-                level = 10;
-                return true;
-            case TK::Gt:
-                op = BinOp::Gt;
-                level = 10;
-                return true;
-            case TK::Le:
-                op = BinOp::Le;
-                level = 10;
-                return true;
-            case TK::Ge:
-                op = BinOp::Ge;
-                level = 10;
-                return true;
-            case TK::Plus:
-                op = BinOp::Add;
-                level = 11;
-                return true;
-            case TK::Minus:
-                op = BinOp::Sub;
-                level = 11;
-                return true;
-            case TK::Star:
-                op = BinOp::Mul;
-                level = 12;
-                return true;
-            case TK::Slash:
-                op = BinOp::Div;
-                level = 12;
-                return true;
-            case TK::Percent:
-                op = BinOp::Mod;
-                level = 12;
-                return true;
-            default:
-                return false;
+            for (const auto &info : kBinOps) {
+                if (info.tk == k) {
+                    op = info.op;
+                    level = info.level;
+                    return true;
+                }
             }
+            return false;
         }
 
-        // `#` 可引用的符号运算符（HAM 0x07 表 4/6-12 级的符号）；
+        // `#` 可引用的符号运算符（HAM 0x07）：op_table.h 中 keyName 非空的行；
         // `$`、`.` 等调用族语法与 `=`、`<-`、`=>`、`->` 声明符不可引用。
         // 扩展自定义运算符前，白名单只放行这一张表
         bool isKnownOpName(const std::string &s) {
-            static const char *const kNames[] = {
-                "|>", "<|", "<~", "||", "&&", "|",  "&",  "==", "!=", "<",
-                ">",  "<=", ">=", "+",  "-",  "*",  "/",  "%",  "!",  "~",
-            };
-            for (const char *n : kNames)
-                if (s == n)
+            for (const auto &info : kBinOps)
+                if (info.keyName && s == info.keyName)
+                    return true;
+            for (const auto &info : kUnOps)
+                if (info.keyName && s == info.keyName)
                     return true;
             return false;
         }
@@ -145,8 +62,8 @@ namespace castam {
         private:
             const std::vector<Token> &toks_;
             size_t i_ = 0;
-            int parenDepth_ = 0;    // 括号嵌套深度，用于判断 x: T 标注是否合法
-            bool stopGt_ = false;   // 解析泛型约束时把 > 视为终止符
+            int parenDepth_ = 0;         // 括号嵌套深度，用于判断 x: T 标注是否合法
+            bool stopGt_ = false;        // 解析泛型约束时把 > 视为终止符
             bool suppressSugar_ = false; // 反引号对内抑制隐式 `_` 包装（HAM 0x01）
 
             // 组合/集合内的一项：声明、组合集合字段或表达式（枚举集合元素）

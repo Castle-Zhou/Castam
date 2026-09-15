@@ -7,6 +7,8 @@
 
 #include "lexer.h"
 
+#include "op_table.h"
+
 using castam::TK;
 using castam::Token;
 
@@ -157,6 +159,16 @@ static void testHashOps() {
     CHECK(toks[8].kind == TK::Ident && toks[8].text == "#");
 }
 
+// 算子表（op_table.h，HAM 0x07 附录）交叉校验：
+// 表里每个 symbol 词法上必须恰好聚成一个 token（缺最长匹配时这里会抓到）
+
+static void testOpTableLexing() {
+    for (const auto &info : castam::kBinOps)
+        CHECK(sameKinds(kinds(info.symbol), {info.tk, TK::Eof}));
+    for (const auto &info : castam::kUnOps)
+        CHECK(sameKinds(kinds(info.symbol), {info.tk, TK::Eof}));
+}
+
 static void testBacktick() {
     // 反引号是裸定界 token（HAM 0x01），成对嵌套与 `_` 检查归 parser
     CHECK_KINDS("`_ + 1`", TK::Backtick, TK::Underscore, TK::Plus, TK::IntLit,
@@ -260,13 +272,13 @@ static void testTempCombSyntax() {
 // 错误用例
 
 static void testErrors() {
-    CHECK(lexThrows("a = \"abc", 1, 5));         // 未闭合字符串
-    CHECK(lexThrows("a = 'ab", 1, 5));           // 未闭合字符
-    CHECK(lexThrows("x @ y", 1, 3));             // 非法字符
-    CHECK(lexThrows("a .. b", 1, 3));            // `..`
-    CHECK(lexThrows("x = \"a\\q\"", 1, 8));      // 未知转义（位于 q）
-    CHECK(lexThrows("x = 'os'", 1, 5));          // 多字符单引号
-    CHECK(lexThrows("x = ''", 1, 5));            // 空字符字面量
+    CHECK(lexThrows("a = \"abc", 1, 5));    // 未闭合字符串
+    CHECK(lexThrows("a = 'ab", 1, 5));      // 未闭合字符
+    CHECK(lexThrows("x @ y", 1, 3));        // 非法字符
+    CHECK(lexThrows("a .. b", 1, 3));       // `..`
+    CHECK(lexThrows("x = \"a\\q\"", 1, 8)); // 未知转义（位于 q）
+    CHECK(lexThrows("x = 'os'", 1, 5));     // 多字符单引号
+    CHECK(lexThrows("x = ''", 1, 5));       // 空字符字面量
 }
 
 #define RUN(t)                                                     \
@@ -286,6 +298,7 @@ int main() {
     RUN(testStrings);
     RUN(testOperators);
     RUN(testHashOps);
+    RUN(testOpTableLexing);
     RUN(testBacktick);
     RUN(testCommentsAndPositions);
     RUN(testSumHamSnippet);

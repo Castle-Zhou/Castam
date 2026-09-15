@@ -1,58 +1,16 @@
 #include "ast_dump.h"
 
+#include "op_table.h"
+
 namespace castam {
 
     namespace {
 
+        // 二元算子的 dump 符号：查 op_table.h 的 kBinOps（HAM 0x07 附录）
         const char *binOpSymbol(BinOp op) {
-            switch (op) {
-            case BinOp::Is:
-                return "is";
-            case BinOp::Isnt:
-                return "isnt";
-            case BinOp::Subseteq:
-                return "subseteq";
-            case BinOp::Subset:
-                return "subset";
-            case BinOp::Delta:
-                return "<|";
-            case BinOp::Pipe:
-                return "|>";
-            case BinOp::SetExt:
-                return "<~";
-            case BinOp::Arrow:
-                return "->";
-            case BinOp::Or:
-                return "||";
-            case BinOp::And:
-                return "&&";
-            case BinOp::Bar:
-                return "|";
-            case BinOp::Amp:
-                return "&";
-            case BinOp::Eq:
-                return "==";
-            case BinOp::NotEq:
-                return "!=";
-            case BinOp::Lt:
-                return "<";
-            case BinOp::Gt:
-                return ">";
-            case BinOp::Le:
-                return "<=";
-            case BinOp::Ge:
-                return ">=";
-            case BinOp::Add:
-                return "+";
-            case BinOp::Sub:
-                return "-";
-            case BinOp::Mul:
-                return "*";
-            case BinOp::Div:
-                return "/";
-            case BinOp::Mod:
-                return "%";
-            }
+            for (const auto &info : kBinOps)
+                if (info.op == op)
+                    return info.symbol;
             return "?";
         }
 

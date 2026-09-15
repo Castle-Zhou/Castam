@@ -7,6 +7,7 @@
 
 #include "ast_dump.h"
 #include "lexer.h"
+#include "op_table.h"
 #include "parser.h"
 
 using namespace castam;
@@ -172,6 +173,36 @@ static void testOperatorRefs() {
       "(decl r (array (op <|) (op |>) (op <~) (op <=) (op !)))");
 }
 
+// 算子表（op_table.h，HAM 0x07 附录）：表中算子的中缀与 `#` 引用形式都要可用
+
+static void testOpTable() {
+    // 每个可 `#` 引用的二元算子：中缀与 # 形式指向同一键名
+    for (const auto &info : kBinOps) {
+        if (!info.keyName)
+            continue;
+        std::string sym = info.symbol;
+        std::string key = info.keyName;
+        P("x = a " + sym + " b", "(decl x (" + sym + " (ident a) (ident b)))");
+        P("x = #" + key + "(a, b)",
+          "(decl x (call (op " + key + ") (ident a) (ident b)))");
+    }
+    // 每个可 `#` 引用的一元算子：`#` 形式可调用
+    for (const auto &info : kUnOps) {
+        if (!info.keyName)
+            continue;
+        std::string key = info.keyName;
+        P("x = #" + key + "(a)", "(decl x (call (op " + key + ") (ident a)))");
+    }
+    // 一元前缀形式
+    P("x = !a", "(decl x (not (ident a)))");
+    P("x = ~a", "(decl x (compl (ident a)))");
+    // `-` 一键两面：二元减号与一元负号共键 `#-`（HAM 0x07）
+    P("x = a - b", "(decl x (- (ident a) (ident b)))");
+    P("x = -a", "(decl x (neg (ident a)))");
+    P("x = #-(a, b)", "(decl x (call (op -) (ident a) (ident b)))");
+    P("x = #-(a)", "(decl x (call (op -) (ident a)))");
+}
+
 // let in / where / if（HAM 0x01/0x02）
 
 static void testTempCombAndIf() {
@@ -218,7 +249,7 @@ static void testErrors() {
     checkError("#<=> = (a, b) => a");    // 白名单外的新运算符
     checkError("x = #<=>(a, b)");        // 同上
     checkError("x = #$");                // `$` 是调用语法，不可引用
-    checkError("#=> = (a, b) => a");      // 箭头/声明符不可引用
+    checkError("#=> = (a, b) => a");     // 箭头/声明符不可引用
 }
 
 int main() {
@@ -228,6 +259,7 @@ int main() {
     testSugarAndAs();
     testBacktickScope();
     testOperatorRefs();
+    testOpTable();
     testTempCombAndIf();
     testCallsAndPostfix();
     testErrors();
