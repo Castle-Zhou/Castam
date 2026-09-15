@@ -36,3 +36,7 @@ target_link_libraries(examples_test PRIVATE castam_core)
 target_compile_definitions(examples_test PRIVATE
   EXAMPLES_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/examples")
 add_test(NAME examples_test COMMAND examples_test)
+
+add_executable(doc_conformance_test tests/doc_conformance_test.cpp)
+target_link_libraries(doc_conformance_test PRIVATE castam_core)
+add_test(NAME doc_conformance_test COMMAND doc_conformance_test)
