@@ -109,6 +109,15 @@ static void testLambdas() {
       "(decl allSum (lambda ((restall args)) (call (ident sum) (spreadall (ident args)))))");
     P("sum2 = (head, ...rest) => head",
       "(decl sum2 (lambda (head (rest rest)) (ident head)))");
+    // 组合解构参数（HAM 0x01：函数的参数可以匹配组合；HAM 0x08 的神谕签名）
+    P("addxy = ({ x, y }) => x + y",
+      "(decl addxy (lambda ((destr x y)) (+ (ident x) (ident y))))");
+    P("play = ({ output, value }) => output",
+      "(decl play (lambda ((destr output value)) (ident output)))");
+    // 键的取值约束写成组合集合形式：({ x: { 1 } })
+    P("f = ({ x: { 1 } }) => x",
+      "(decl f (lambda ((destr (x (enum (int 1))))) (ident x)))");
+    P("f = ({x, y}, z) => x", "(decl f (lambda ((destr x y) z) (ident x)))");
 }
 
 // `_` 糖与 as（HAM 0x01/0x02）
@@ -259,6 +268,7 @@ static void testErrors() {
     checkError("x = { 1, y = 2 }");      // {} 内混合表达式与声明
     checkError("x = <T> 1");             // 泛型后不是函数声明
     checkError("f = (1) => 2");          // 非法参数列表
+    checkError("f = ({x = 1}) => x");    // 组合模式参数不能写声明（HAM 0x01）
     checkError("x = (1 + 2");            // 未闭合括号
     checkError("_ = 1");                 // _ 不能作为键名（HAM 0x00）
     checkError("x = `_ + 1");            // 未闭合的反引号

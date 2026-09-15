@@ -65,8 +65,17 @@ namespace castam {
                         out += ")";
                     } else if constexpr (std::is_same_v<T, PatDestructure>) {
                         out += "(destr";
-                        for (const auto &k : pat.keys)
-                            out += " " + k;
+                        for (const auto &k : pat.keys) {
+                            out += " ";
+                            if (k.type) {
+                                // 键的取值约束（HAM 0x01 的 { x: { 1 } }）
+                                out += "(" + k.name + " ";
+                                dumpChild(k.type, out);
+                                out += ")";
+                            } else {
+                                out += k.name;
+                            }
+                        }
                         out += ")";
                     } else if constexpr (std::is_same_v<T, PatOp>) {
                         out += "(op " + pat.name + ")";
@@ -95,11 +104,13 @@ namespace castam {
                 break;
             }
             if (p.type) {
-                out += "(typed " + p.name + " ";
+                out += "(typed ";
+                dumpPattern(p.pattern, out);
+                out += " ";
                 dumpChild(p.type, out);
                 out += ")";
             } else {
-                out += p.name;
+                dumpPattern(p.pattern, out);
             }
             if (p.pack != PackKind::None)
                 out += ")";

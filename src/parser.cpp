@@ -323,10 +323,10 @@ namespace castam {
                 if (at(TK::LBrace)) {
                     // 解构 {x, y}：只有纯键列表才是，否则回退给花括号表达式
                     advance();
-                    std::vector<std::string> keys;
+                    std::vector<PatKeyField> keys;
                     bool ok = at(TK::Ident);
                     while (ok) {
-                        keys.push_back(advance().text);
+                        keys.push_back(PatKeyField{advance().text, nullptr});
                         if (eat(TK::Comma)) {
                             if (at(TK::RBrace))
                                 break;
@@ -761,12 +761,12 @@ namespace castam {
             }
 
             // 把 => 左侧的节点转换为参数列表：Ident / 结构逐项
-            // 合法项：x、x: T、...x、....x（HAM 0x01/0x02/0x05）
+            // 合法项：x、x: T、...x、....x（HAM 0x01/0x02/0x05）、组合解构（HAM 0x01）
             std::vector<Param> toParams(NodePtr &node, const Token &at) {
                 std::vector<Param> out;
                 std::function<Param(NodePtr &)> convOne = [&](NodePtr &n) -> Param {
                     if (auto *id = std::get_if<Ident>(&n->kind))
-                        return Param{id->name, nullptr};
+                        return Param{PatIdent{id->name}, nullptr};
                     if (auto *t = std::get_if<Typed>(&n->kind)) {
                         Param p = convOne(t->expr);
                         p.type = std::move(t->type);
@@ -777,6 +777,27 @@ namespace castam {
                         p.pack = s->all ? PackKind::All : PackKind::Rest;
                         return p;
                     }
+                    // 组合解构参数（HAM 0x01：函数的参数可以匹配组合）
+                    // ({ x, y }) 归组后是 EnumSet；({ x: { 1 } }) 是 CombSet
+                    if (auto *es = std::get_if<EnumSet>(&n->kind)) {
+                        PatDestructure pat;
+                        for (auto &el : es->elems) {
+                            auto *k = std::get_if<Ident>(&el->kind);
+                            if (!k)
+                                error("非法的参数列表", loc(at));
+                            pat.keys.push_back(PatKeyField{k->name, nullptr});
+                        }
+                        return Param{std::move(pat), nullptr};
+                    }
+                    if (auto *cs = std::get_if<CombSet>(&n->kind)) {
+                        PatDestructure pat;
+                        for (auto &f : cs->fields)
+                            pat.keys.push_back(PatKeyField{f.name, std::move(f.type)});
+                        return Param{std::move(pat), nullptr};
+                    }
+                    if (std::holds_alternative<CombLit>(n->kind))
+                        error("组合模式参数不能写声明；要约束键的取值请写成 { x: { 1 } }",
+                              loc(at));
                     error("非法的参数列表", loc(at));
                 };
                 if (auto *st = std::get_if<StructLit>(&node->kind)) {
@@ -792,7 +813,7 @@ namespace castam {
             NodePtr wrapSugar(NodePtr e) {
                 SrcLoc l = e->loc;
                 Lambda lam;
-                lam.params.push_back(Param{"_", nullptr});
+                lam.params.push_back(Param{PatIdent{"_"}, nullptr});
                 lam.body = std::move(e);
                 lam.sugar = true;
                 return makeNode(std::move(lam), l);

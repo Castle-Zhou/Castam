@@ -55,7 +55,10 @@ static void testCombAndPatterns() {
     comb.items.push_back(decl(PatPath{"comb", {"x"}, {}}, num("2")));
     comb.items.push_back(decl(PatPath{"comb", {}, {"a", "b"}}, id("comb1")));
     comb.items.push_back(decl(PatPath{"comb", {"x"}, {"a"}}, num("3")));
-    comb.items.push_back(decl(PatDestructure{{"x", "y"}}, id("comb")));
+    PatDestructure destr;
+    destr.keys.push_back(PatKeyField{"x", nullptr});
+    destr.keys.push_back(PatKeyField{"y", nullptr});
+    comb.items.push_back(decl(std::move(destr), id("comb")));
     comb.items.push_back(decl(PatOp{"+"}, num("4")));
     checkDump(makeNode(std::move(comb)),
               "(comb (decl x (int 1)) (decl (path comb x) (int 2))"
@@ -64,6 +67,15 @@ static void testCombAndPatterns() {
               " (decl (destr x y) (ident comb))"
               " (decl (op +) (int 4)))");
     checkDump(makeNode(CombLit{}), "(comb)");
+
+    // 带取值约束的解构键（HAM 0x01 组合模式参数的 { x: { 1 } }）
+    PatDestructure ddestr;
+    ddestr.keys.push_back(PatKeyField{"x", nullptr});
+    ddestr.keys.push_back(PatKeyField{"y", id("Int")});
+    CombLit dcomb;
+    dcomb.items.push_back(decl(std::move(ddestr), id("c")));
+    checkDump(makeNode(std::move(dcomb)),
+              "(comb (decl (destr x (y (ident Int))) (ident c)))");
 }
 
 // 集合的三种表达式形态
@@ -84,7 +96,7 @@ static void testSets() {
     // {...|_ % 2 == 1 }（parser 会把 _ 糖包成 lambda*）
     auto pred = bin(BinOp::Eq, bin(BinOp::Mod, makeNode(Placeholder{}), num("2")), num("1"));
     Lambda sugar;
-    sugar.params.push_back(Param{"_", nullptr});
+    sugar.params.push_back(Param{PatIdent{"_"}, nullptr});
     sugar.body = std::move(pred);
     sugar.sugar = true;
     checkDump(makeNode(PredSet{makeNode(std::move(sugar))}),
@@ -99,16 +111,16 @@ static void testLambdas() {
     lam.generics.push_back(GenericParam{"T", id("U")});
     lam.generics.push_back(GenericParam{"V", nullptr});
     Param mul;
-    mul.name = "mul";
+    mul.pattern = PatIdent{"mul"};
     mul.type = id("T");
     lam.params.push_back(std::move(mul));
-    lam.params.push_back(Param{"x", id("T")});
+    lam.params.push_back(Param{PatIdent{"x"}, id("T")});
     Param rest;
-    rest.name = "rest";
+    rest.pattern = PatIdent{"rest"};
     rest.pack = PackKind::Rest;
     lam.params.push_back(std::move(rest));
     Param all;
-    all.name = "args";
+    all.pattern = PatIdent{"args"};
     all.type = id("Int");
     all.pack = PackKind::All;
     lam.params.push_back(std::move(all));
@@ -223,9 +235,9 @@ static void testPostfixAndContainers() {
 static void testSumHamShape() {
     // sum <- 0 <| (first, ...rest) => first + sum(rest...)
     Lambda lam;
-    lam.params.push_back(Param{"first", nullptr});
+    lam.params.push_back(Param{PatIdent{"first"}, nullptr});
     Param rest;
-    rest.name = "rest";
+    rest.pattern = PatIdent{"rest"};
     rest.pack = PackKind::Rest;
     lam.params.push_back(std::move(rest));
     Call sumCall;

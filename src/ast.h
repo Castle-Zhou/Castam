@@ -65,8 +65,13 @@ namespace castam {
         std::vector<std::string> segs;    // .x.y 的键链
         std::vector<std::string> extKeys; // .{a, b} 的键列表，为空表示无此尾段
     };
+    // 解构的键：type 可空，非空是键的取值约束（HAM 0x01 组合模式参数的 { x: { 1 } }）
+    struct PatKeyField {
+        std::string name;
+        NodePtr type;
+    };
     struct PatDestructure {
-        std::vector<std::string> keys; // {x, y} = comb
+        std::vector<PatKeyField> keys; // {x, y} = comb 与 ({x, y}) => ...
     };
     struct PatOp {
         std::string name; // `#+` = ...（HAM 0x07 的运算符声明）
@@ -88,8 +93,8 @@ namespace castam {
     };
 
     struct Param {
-        std::string name;
-        NodePtr type; // 可空：x: Int 的标注
+        Pattern pattern; // 通常 PatIdent；组合解构参数（HAM 0x01）为 PatDestructure
+        NodePtr type;    // 可空：x: Int 的标注
         PackKind pack = PackKind::None;
     };
 
