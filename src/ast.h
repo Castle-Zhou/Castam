@@ -23,29 +23,30 @@ namespace castam {
     // 二元运算符，优先级见 HAM 0x07 附录
     // `as` 不在其中，它是专用节点 As（右侧必须是集合/类型表达式，HAM 0x02）
     enum class BinOp {
-        Is,       // is（HAM 0x03）
-        Isnt,     // isnt
-        Subseteq, // subseteq
-        Subset,   // subset
-        Delta,    // <|（HAM 0x00/0x01）
-        Pipe,     // |>（HAM 0x01）
-        SetExt,   // <~（HAM 0x03）
-        Arrow,    // ->（函数集合，HAM 0x02）
-        Or,       // ||
-        And,      // &&
-        Bar,      // |（集合并、数组过滤，HAM 0x03/0x06）
-        Amp,      // &
-        Eq,       // ==
-        NotEq,    // !=
-        Lt,       // <
-        Gt,       // >
-        Le,       // <=
-        Ge,       // >=
-        Add,      // +
-        Sub,      // -
-        Mul,      // *
-        Div,      // /
-        Mod,      // %
+        Is,        // is（HAM 0x03）
+        Isnt,      // isnt
+        Subseteq,  // subseteq
+        Subset,    // subset
+        Delta,     // <|（HAM 0x00/0x01）
+        Pipe,      // |>（HAM 0x01）
+        SetExt,    // <~（HAM 0x03）
+        Arrow,     // ->（函数集合，HAM 0x02）
+        Or,        // ||
+        And,       // &&
+        Bar,       // |（集合并、数组过滤，HAM 0x03/0x06）
+        Amp,       // &
+        Eq,        // ==
+        NotEq,     // !=
+        Lt,        // <
+        Gt,        // >
+        Le,        // <=
+        Ge,        // >=
+        Spaceship, // <=>（三向比较，HAM 0x07 附录）
+        Add,       // +
+        Sub,       // -
+        Mul,       // *
+        Div,       // /
+        Mod,       // %
     };
 
     // 一元运算符（HAM 0x07，11 级）

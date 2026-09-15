@@ -51,6 +51,7 @@ namespace castam {
         {TK::Gt, BinOp::Gt, ">", ">", 10},
         {TK::Le, BinOp::Le, "<=", "<=", 10},
         {TK::Ge, BinOp::Ge, ">=", ">=", 10},
+        {TK::Spaceship, BinOp::Spaceship, "<=>", "<=>", 10},
         {TK::Plus, BinOp::Add, "+", "+", 11},
         {TK::Minus, BinOp::Sub, "-", "-", 11},
         {TK::Star, BinOp::Mul, "*", "*", 12},

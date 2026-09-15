@@ -124,6 +124,8 @@ namespace castam {
             return "Le";
         case TK::Ge:
             return "Ge";
+        case TK::Spaceship:
+            return "Spaceship";
         }
         return "?";
     }
@@ -396,6 +398,8 @@ namespace castam {
                           startCol);
                 }
                 if (matchOp(TK::Ellipsis, "..."))
+                    return;
+                if (matchOp(TK::Spaceship, "<=>"))
                     return;
                 if (matchOp(TK::FatArrow, "=>"))
                     return;

@@ -72,6 +72,7 @@ namespace castam {
         Gt,
         Le,
         Ge,
+        Spaceship, // <=>（三向比较，HAM 0x07 附录第 9 档）
     };
 
     struct Token {

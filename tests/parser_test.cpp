@@ -168,6 +168,8 @@ static void testOperatorRefs() {
     P("x = #+(a, b)", "(decl x (call (op +) (ident a) (ident b)))");
     P("#+ = #+ <| (a, b) => a",
       "(decl (op +) (<| (op +) (lambda (a b) (ident a))))");
+    // `<=>`（HAM 0x07 附录第 9 档）同样可声明与引用
+    P("#<=> = (a, b) => a", "(decl (op <=>) (lambda (a b) (ident a)))");
     // 其余有符号运算符同样可引用
     P("r = [#<|, #|>, #<~, #<=, #!]",
       "(decl r (array (op <|) (op |>) (op <~) (op <=) (op !)))");
@@ -201,6 +203,8 @@ static void testOpTable() {
     P("x = -a", "(decl x (neg (ident a)))");
     P("x = #-(a, b)", "(decl x (call (op -) (ident a) (ident b)))");
     P("x = #-(a)", "(decl x (call (op -) (ident a)))");
+    // `<=>` 与其它比较同级、左结合（HAM 0x07 附录第 9 档）
+    P("x = a <=> b <=> c", "(decl x (<=> (<=> (ident a) (ident b)) (ident c)))");
 }
 
 // let in / where / if（HAM 0x01/0x02）
@@ -246,8 +250,6 @@ static void testErrors() {
     checkError("_ = 1");                 // _ 不能作为键名（HAM 0x00）
     checkError("x = `_ + 1");            // 未闭合的反引号
     checkError("x = `f(x)`");            // 反引号对内没有 `_`
-    checkError("#<=> = (a, b) => a");    // 白名单外的新运算符
-    checkError("x = #<=>(a, b)");        // 同上
     checkError("x = #$");                // `$` 是调用语法，不可引用
     checkError("#=> = (a, b) => a");     // 箭头/声明符不可引用
 }

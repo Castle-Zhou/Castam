@@ -99,6 +99,7 @@ int main() {
                  " (decl mainCl (call (ident cl) (call (ident game) (ident os)))))");
 
     checkParses("hexagons.ham");
+    checkParses("dijkstra.ham");
 
     if (g_failures == 0) {
         std::cout << "examples_test: all tests passed\n";

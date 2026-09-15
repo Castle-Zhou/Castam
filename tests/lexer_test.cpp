@@ -120,6 +120,10 @@ static void testOperators() {
     CHECK_KINDS("a<|b<-c<~d<=e<f<g", TK::Ident, TK::Delta, TK::Ident,
                 TK::RecDecl, TK::Ident, TK::SetExt, TK::Ident, TK::Le, TK::Ident,
                 TK::Lt, TK::Ident, TK::Lt, TK::Ident);
+    // `<=>` 三向比较（HAM 0x07 附录第 9 档）：最长匹配优先于 `<=`
+    CHECK_KINDS("<=>", TK::Spaceship);
+    CHECK_KINDS("a<=>b<=c", TK::Ident, TK::Spaceship, TK::Ident, TK::Le,
+                TK::Ident);
     CHECK_KINDS("|>", TK::Pipe);
     CHECK_KINDS("|", TK::Bar);
     CHECK_KINDS("||", TK::OrOr);
