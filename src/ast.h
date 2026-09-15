@@ -124,7 +124,8 @@ namespace castam {
     struct OpRef {
         std::string name;
     };
-    // `_` 语法糖占位符（HAM 0x01），parser 在表达式边界或反引号定界处把它包成 Lambda
+    // `_` 语法糖占位符（HAM 0x01）：必须由反引号定界，parser 在闭反引号处把它
+    // 所在表达式包成单参糖 Lambda；裸 `_` 是语法错误
     struct Placeholder {};
 
     // 组合字面量 { x = 1, f <- ... }（HAM 0x00）

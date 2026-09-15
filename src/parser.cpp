@@ -146,6 +146,29 @@ namespace castam {
             return false;
         }
 
+        // 收尾校验（A5）：任何 Placeholder 都必须由反引号定界（HAM 0x01）
+        // 迭代遍历（显式栈，B2）：糖 lambda 的 body 下潜时 sugarDepth+1，
+        // sugarDepth == 0 的 Placeholder 即未定界；
+        // `` `x => _` `` 的 `_` 在反引号作用域内，绑定外层糖参数，不报错
+        void checkPlaceholdersDelimited(const Node &root) {
+            std::vector<std::pair<const Node *, int>> stack{{&root, 0}};
+            while (!stack.empty()) {
+                auto [n, sugarDepth] = stack.back();
+                stack.pop_back();
+                if (std::holds_alternative<Placeholder>(n->kind)) {
+                    if (sugarDepth == 0)
+                        throw ParseError("占位符 _ 必须由反引号定界", n->loc.line,
+                                         n->loc.col);
+                    continue;
+                }
+                int childDepth = sugarDepth;
+                if (auto *lam = std::get_if<Lambda>(&n->kind); lam && lam->sugar)
+                    ++childDepth;
+                forEachChild(*n,
+                             [&](const Node &c) { stack.emplace_back(&c, childDepth); });
+            }
+        }
+
         class Parser {
         public:
             explicit Parser(const std::vector<Token> &toks) : toks_(toks) {}
@@ -167,10 +190,9 @@ namespace castam {
         private:
             const std::vector<Token> &toks_;
             size_t i_ = 0;
-            int parenDepth_ = 0;         // 括号嵌套深度，用于判断 x: T 标注是否合法
-            int exprDepth_ = 0;          // parseExpr 递归深度（B2 护栏，ExprDepthGuard 维护）
-            bool stopGt_ = false;        // 解析泛型约束时把 > 视为终止符
-            bool suppressSugar_ = false; // 反引号对内抑制隐式 `_` 包装（HAM 0x01）
+            int parenDepth_ = 0;  // 括号嵌套深度，用于判断 x: T 标注是否合法
+            int exprDepth_ = 0;   // parseExpr 递归深度（B2 护栏，ExprDepthGuard 维护）
+            bool stopGt_ = false; // 解析泛型约束时把 > 视为终止符
 
             // 组合/集合内的一项：声明、组合集合字段或表达式（枚举集合元素）
             struct Item {
@@ -323,13 +345,9 @@ namespace castam {
                 return false;
             }
 
-            // ------------------------------------------------------------ 表达式
+            // ---------------------------------------------------- 表达式
 
-            // Pratt 主循环
-            // minBp ≤ 10 返回时，若子树含自由 `_` 则包成糖 lambda（HAM 0x01）
-            // 这让 `|`/`&`（9 级）的 rhs 恰好在边界上（arr | _ > 1），
-            // 而比较/算术/前缀运算的操作数不提前包裹
-            // 反引号对内由 suppressSugar_ 抑制，改在闭反引号处统一包裹
+            // Pratt 主循环（中缀绑定力查 op_table.h，特例构造见下方各分支）
             NodePtr parseExpr(int minBp) {
                 // 深度护栏（B2）：嵌套超限抛 ParseError 而不是递归爆栈
                 ExprDepthGuard depthGuard{exprDepth_};
@@ -396,13 +414,12 @@ namespace castam {
                         e = makeNode(TempComb{parseExpr(4), std::move(e)}, loc(w));
                         continue;
                     }
-                    // as（2 级，左结合）：左侧含自由 `_` 时先包成糖 lambda
-                    // 使 _ + 1 as Int -> Int 语义为给整个函数标注类型
+                    // as（2 级，左结合）
                     if (at(TK::KwAs)) {
                         if (2 < minBp)
                             break;
                         Token a = advance();
-                        e = makeNode(As{wrapIfPlaceholder(std::move(e)), parseType()}, loc(a));
+                        e = makeNode(As{std::move(e), parseType()}, loc(a));
                         continue;
                     }
                     // $（14 级，左结合）：f $ (a)，rhs 的结构展开为参数
@@ -430,8 +447,6 @@ namespace castam {
                     Token tok = advance();
                     e = makeNode(Binary{op, std::move(e), parseExpr(level + 1)}, loc(tok));
                 }
-                if (minBp <= 10)
-                    e = wrapIfPlaceholder(std::move(e));
                 return e;
             }
 
@@ -545,45 +560,30 @@ namespace castam {
 
             // 反引号 `_` 范围（HAM 0x01）：`` `expr` `` 是单参糖 lambda 的显式定界，
             // 对内至少一个 `_`，多个 `_` 绑同一个参数，内层对的 `_` 绑定内层
-            // 闭反引号的位置由试探解析决定：逐个候选试，要求内容恰好解析为一个
-            // 完整表达式且含顶层自由 `_`（如 `` `_ <| `_ + 1`` `` 中第一个 `` ` ``
-            // 不能与第二个配对，因为 `_ <|` 不是完整表达式）
+            // 内容恰好解析为一个表达式且正好停在反引号才算闭合——解析结果与候选闭
+            // 反引号的位置无关（B1：旧实现逐候选重试同一份输入，嵌套后指数爆炸），
+            // 单遍解析即可，闭反引号处包成单参糖 lambda
             NodePtr parseBacktickScope() {
                 Token open = advance(); // '`'
-                bool sawNoPlaceholder = false;
-                for (size_t j = i_; j < toks_.size(); ++j) {
-                    if (toks_[j].kind != TK::Backtick)
-                        continue;
-                    size_t save = i_;
-                    int saveParenDepth = parenDepth_;
-                    bool saveStopGt = stopGt_;
-                    bool saveSuppress = suppressSugar_;
-                    suppressSugar_ = true;
-                    NodePtr content;
-                    try {
-                        content = parseExpr(1);
-                    } catch (const GuardError &) {
-                        throw; // 护栏错误是终态，不作为候选失败重试
-                    } catch (const ParseError &) {
-                        content = nullptr;
-                    }
-                    size_t stop = i_;
-                    i_ = save;
-                    parenDepth_ = saveParenDepth;
-                    stopGt_ = saveStopGt;
-                    suppressSugar_ = saveSuppress;
-                    // stop 越过 j 说明候选被嵌套反引号消耗，提前停下同理，都拒绝
-                    if (!content || stop != j)
-                        continue;
-                    if (!hasFreePlaceholder(*content)) {
-                        sawNoPlaceholder = true;
-                        continue;
-                    }
-                    i_ = j + 1; // 消费闭反引号
+                NodePtr content;
+                try {
+                    content = parseExpr(1);
+                } catch (const GuardError &) {
+                    throw; // 护栏错误是终态，直接传播
+                } catch (const ParseError &) {
+                    // open 之后还有反引号 → 真语法错误发生在 scope 内
+                    // （如 `_ + * 2`），原样抛出；其后没有反引号 → 按未闭合报错
+                    for (size_t j = i_; j < toks_.size(); ++j)
+                        if (toks_[j].kind == TK::Backtick)
+                            throw;
+                    error("未闭合的反引号", loc(open));
+                }
+                if (at(TK::Backtick)) {
+                    if (!hasFreePlaceholder(*content))
+                        error("反引号对内必须至少有一个 `_`", loc(open));
+                    advance(); // 消费闭反引号
                     return wrapSugar(std::move(content));
                 }
-                if (sawNoPlaceholder)
-                    error("反引号对内必须至少有一个 `_`", loc(open));
                 error("未闭合的反引号", loc(open));
             }
 
@@ -593,7 +593,7 @@ namespace castam {
                 NodePtr t = parseArrowType();
                 if (at(TK::KwAs)) {
                     Token a = advance();
-                    t = makeNode(As{wrapIfPlaceholder(std::move(t)), parseType()}, loc(a));
+                    t = makeNode(As{std::move(t), parseType()}, loc(a));
                 }
                 return t;
             }
@@ -797,18 +797,14 @@ namespace castam {
                 lam.sugar = true;
                 return makeNode(std::move(lam), l);
             }
-
-            // `_` 糖：子树含自由 Placeholder 时包成单参 lambda（HAM 0x01）
-            // 反引号对内（suppressSugar_）抑制，统一在闭反引号处包装
-            NodePtr wrapIfPlaceholder(NodePtr e) {
-                if (suppressSugar_ || !hasFreePlaceholder(*e))
-                    return e;
-                return wrapSugar(std::move(e));
-            }
         };
 
     } // namespace
 
-    NodePtr parse(const std::vector<Token> &tokens) { return Parser(tokens).run(); }
+    NodePtr parse(const std::vector<Token> &tokens) {
+        NodePtr root = Parser(tokens).run();
+        checkPlaceholdersDelimited(*root);
+        return root;
+    }
 
 } // namespace castam

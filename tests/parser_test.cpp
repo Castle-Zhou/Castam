@@ -74,8 +74,8 @@ static void testBracesAndPatterns() {
     P("p = (e: {x: Num, y: Num}) => e.x",
       "(decl p (lambda ((typed e (combset (field x (ident Num)) (field y (ident Num)))))"
       " (. (ident e) x)))");
-    P("e = {...|_ % 2 == 1 }",
-      "(decl e (predset (lambda* (_) (== (% (placeholder) (int 2)) (int 1)))))");
+    // 裸 `_` 必须由反引号定界（HAM 0x01；反引号形式的正例见 testBacktickScope）
+    checkError("e = {...|_ % 2 == 1 }");
     P("f = {...| x: Int -> Bool => x % 2 == 0 }",
       "(decl f (predset (lambda ((typed x (-> (ident Int) (ident Bool))))"
       " (== (% (ident x) (int 2)) (int 0)))))");
@@ -114,16 +114,15 @@ static void testLambdas() {
 // `_` 糖与 as（HAM 0x01/0x02）
 
 static void testSugarAndAs() {
-    P("inc = _ + 1", "(decl inc (lambda* (_) (+ (placeholder) (int 1))))");
-    P("r = arr | _ > 1", "(decl r (| (ident arr) (lambda* (_) (> (placeholder) (int 1)))))");
-    P("fs = [_, -_]",
-      "(decl fs (array (lambda* (_) (placeholder)) (lambda* (_) (neg (placeholder)))))");
+    // 裸 `_` 必须由反引号定界（HAM 0x01；反引号形式的正例见 testBacktickScope）
+    checkError("inc = _ + 1");
+    checkError("r = arr | _ > 1");
+    checkError("fs = [_, -_]");
     P("x = 1 as Int", "(decl x (as (int 1) (ident Int)))");
     P("y = { x = 1 } as { x: Int }",
       "(decl y (as (comb (decl x (int 1))) (combset (field x (ident Int)))))");
-    // as 左侧的 `_` 先包成糖 lambda，类型标注作用于整个函数
-    P("inc = _ + 1 as Int -> Int",
-      "(decl inc (as (lambda* (_) (+ (placeholder) (int 1))) (-> (ident Int) (ident Int))))");
+    // as 不救裸 `_`：反引号定界后 as 才作用于整个函数（正例见 testBacktickScope）
+    checkError("inc = _ + 1 as Int -> Int");
     // 类型位置同样允许 as（HAM 0x03）：as Set 吃到组合面、留下集合值面
     P("Env = { q: Heap(Pair(Int, Int)) as Set }",
       "(decl Env (combset (field q (as (call (ident Heap) (call (ident Pair) (ident Int)"
@@ -157,6 +156,20 @@ static void testBacktickScope() {
     P("y = `_+1` $ (3)", "(decl y (call$ (lambda* (_) (+ (placeholder) (int 1))) (int 3)))");
     P("inc = `_ + 1` as Int -> Int",
       "(decl inc (as (lambda* (_) (+ (placeholder) (int 1))) (-> (ident Int) (ident Int))))");
+}
+
+// B1：反引号单遍配对——嵌套未闭合反引号必须瞬时抛 ParseError（挂住即回归）
+
+static void testBacktickRobustness() {
+    // 文档 4.2 的指数爆炸形态：n 个开反引号 + `_`，全部未闭合
+    checkError("x = " + std::string(8, '`') + " _");
+    checkError("x = " + std::string(9, '`') + " _");
+    checkError("x = " + std::string(10, '`') + " _");
+    checkError("x = " + std::string(200, '`') + " _");
+    // scope 内的真语法错误原样抛出（不吞成"未闭合"）
+    checkError("x = `_ + * 2`");
+    // `_` 在反引号作用域内绑定外层糖参数（HAM 0x01），不是裸 `_`
+    P("f = `x => _`", "(decl f (lambda* (_) (lambda (x) (placeholder))))");
 }
 
 // `#` 运算符名（HAM 0x07）：白名单内的符号转成算子引用/声明目标
@@ -294,6 +307,7 @@ int main() {
     testLambdas();
     testSugarAndAs();
     testBacktickScope();
+    testBacktickRobustness();
     testOperatorRefs();
     testOpTable();
     testTempCombAndIf();
