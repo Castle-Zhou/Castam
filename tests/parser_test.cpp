@@ -254,6 +254,16 @@ static void testTempCombAndIf() {
     P("b = if (c) 100 else 10", "(decl b (if (ident c) (int 100) (int 10)))");
     P("x = if (a) 1 else if (b) 2 else 3",
       "(decl x (if (ident a) (int 1) (if (ident b) (int 2) (int 3))))");
+    // else 分支停在管道级之前（HAM 0x02）：is/as/where/|> / <| 作用于整个 if
+    P("a = if (c) 1 else 2 where { c = true }",
+      "(decl a (tempcomb (comb (decl c (bool true))) (if (ident c) (int 1) (int 2))))");
+    P("b = if (c) 1 else \"a\" is Int",
+      "(decl b (is (if (ident c) (int 1) (str \"a\")) (ident Int)))");
+    P("f = a <| if (c) 1 else 2 <| b",
+      "(decl f (<| (<| (ident a) (if (ident c) (int 1) (int 2))) (ident b)))");
+    // then 分支里的 is 属于该分支
+    P("x = if (c) a is Int else b",
+      "(decl x (if (ident c) (is (ident a) (ident Int)) (ident b)))");
 }
 
 // 调用族与后缀（HAM 0x01/0x06）

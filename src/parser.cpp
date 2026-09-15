@@ -745,10 +745,13 @@ namespace castam {
                 expect(TK::LParen, "if 条件的 (");
                 NodePtr cond = parseExpr(1);
                 expect(TK::RParen, "if 条件的 )");
+                // then 延伸到 else 为止（else 天然界定）；
+                // else 与 λ 同级（6 级）：is/as、let in/where、|>、<|、<~
+                // 作用于整个 if，要作用于 else 分支本身请加括号（HAM 0x02）
                 NodePtr thenB = parseExpr(1);
                 NodePtr elseB;
                 if (eat(TK::KwElse))
-                    elseB = parseExpr(1);
+                    elseB = parseExpr(6);
                 return makeNode(IfExpr{std::move(cond), std::move(thenB), std::move(elseB)},
                                 loc(ifTok));
             }
