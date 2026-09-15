@@ -240,6 +240,11 @@ namespace castam {
             Item parseItem() {
                 size_t save = i_;
                 SrcLoc itemLoc = loc(peek());
+                // `_` 不能作为键名（HAM 0x00），它是单参函数的语法糖占位符（HAM 0x01）
+                if (at(TK::Underscore) &&
+                    (peek(1).kind == TK::Eq || peek(1).kind == TK::RecDecl ||
+                     peek(1).kind == TK::Colon))
+                    error("_ 不能作为键名（单参函数的语法糖占位符）", itemLoc);
                 Pattern pat;
                 if (tryParsePattern(pat)) {
                     if (at(TK::Eq) || at(TK::RecDecl)) {
@@ -250,7 +255,10 @@ namespace castam {
                         item.decl = Decl{std::move(pat), parseExpr(1), recursive};
                         return item;
                     }
-                    if (at(TK::Colon) && std::holds_alternative<PatIdent>(pat)) {
+                    if (at(TK::Colon)) {
+                        // 组合集合的字段只允许裸键名（HAM 0x02），路径不行
+                        if (!std::holds_alternative<PatIdent>(pat))
+                            error("组合集合的字段名必须是键名，不能是路径", itemLoc);
                         advance();
                         Item item;
                         item.kind = Item::Kind::Field;
@@ -692,7 +700,12 @@ namespace castam {
                 std::vector<Item> items;
                 while (!at(TK::RBrace)) {
                     items.push_back(parseItem());
-                    eat(TK::Comma);
+                    if (eat(TK::Comma))
+                        continue;
+                    // 组合（声明）与组合的集合表达式（字段）可省逗号（HAM 0x00）；
+                    // 集合的列举（表达式元素）之间必须逗号
+                    if (!at(TK::RBrace) && items.back().kind == Item::Kind::Expr)
+                        error("集合元素之间需要逗号", loc(peek()));
                 }
                 expect(TK::RBrace, "}");
                 if (items.empty())

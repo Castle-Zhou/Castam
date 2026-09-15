@@ -94,6 +94,10 @@ static void testBracesAndPatterns() {
     // 逗号可选（HAM 0x00）
     P("x = 1 y = 2", "(decl x (int 1)) (decl y (int 2))");
     P("z = { a = 1 b = 2 }", "(decl z (comb (decl a (int 1)) (decl b (int 2))))");
+    // 组合的集合表达式（字段）同样可省逗号；列举集合元素之间必须逗号
+    P("t = { x: Int y: Int }",
+      "(decl t (combset (field x (ident Int)) (field y (ident Int))))");
+    P("x = { 0, 1, 2, }", "(decl x (enum (int 0) (int 1) (int 2)))");
 }
 
 // lambda 全形态（HAM 0x01/0x02/0x05/0x06）
@@ -278,6 +282,9 @@ static void testErrors() {
     checkError("x: Int = 1");            // 顶层不是声明（旧类型标记已砍）
     checkError("x = { a = 1, b: Int }"); // {} 内混合声明与集合字段
     checkError("x = { 1, y = 2 }");      // {} 内混合表达式与声明
+    checkError("x = { 1 2 3 }");         // 集合元素之间需要逗号
+    checkError("x = { _ = 4 }");         // `_` 不能作为键名（HAM 0x00）
+    checkError("x = { comb.x: Int }");   // 组合集合的字段名必须是键名，不能是路径
     checkError("x = <T> 1");             // 泛型后不是函数声明
     checkError("f = (1) => 2");          // 非法参数列表
     checkError("f = ({x = 1}) => x");    // 组合模式参数不能写声明（HAM 0x01）
