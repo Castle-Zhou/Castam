@@ -1,5 +1,5 @@
 // 示例文件的端到端快照测试：完整解析 tests/examples/*.ham 并比对全文 dump
-// 示例从 ~/Code/ham/examples/ 复制，guess.ham 的声明逗号已与语言规则对齐
+// 示例原样复制自 ~/Code/ham/examples/，HAM 文档变更时需重新复制
 
 #include <fstream>
 #include <iostream>
@@ -45,6 +45,19 @@ static void checkExample(const char *name, const std::string &want) {
     }
 }
 
+// 只断言示例能完整解析（用于全文 dump 过长、快照过脆的文件）
+static void checkParses(const char *name) {
+    std::string src = readFile(std::string(EXAMPLES_DIR) + "/" + name);
+    if (src.empty())
+        return;
+    try {
+        parse(lex(src));
+    } catch (const std::exception &e) {
+        std::cerr << name << ": parse threw: " << e.what() << '\n';
+        ++g_failures;
+    }
+}
+
 int main() {
     checkExample("sum.ham",
                  "(comb (decl<- sum (<| (int 0) (lambda (first (rest rest))"
@@ -53,7 +66,7 @@ int main() {
     checkExample("sort.ham",
                  "(comb (decl arr (array (int 1) (int 2) (int 3) (int 4) (int 5)))"
                  " (decl<- sort (lambda (arr)"
-                 " (if (> (. (ident arr) length) (int 0))"
+                 " (if (> (call (. (ident Array) length) (ident arr)) (int 0))"
                  " (+ (+ (call (ident sort) (| (ident arr) (lambda* (_)"
                  " (< (placeholder) (index (ident arr) (int 0))))))"
                  " (| (ident arr) (lambda* (_) (== (placeholder) (index (ident arr) (int 0))))))"
@@ -84,6 +97,8 @@ int main() {
                  " (call (ident guess) (call (. (. os) output) (str \"Too Big.\\n\")))))))))"
                  " (call (. guess) (. os))))"
                  " (decl mainCl (call (ident cl) (call (ident game) (ident os)))))");
+
+    checkParses("hexagons.ham");
 
     if (g_failures == 0) {
         std::cout << "examples_test: all tests passed\n";

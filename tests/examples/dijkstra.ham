@@ -1,0 +1,126 @@
+Heap = (T: Set) => let {    
+  Node <- {
+    value: T
+    left: Node
+    right: Node
+    leftSize: Int
+    rightSize: Int
+  }
+
+  push <- (top: Node, x: T) -> Node =>
+    if (top == {}) {}
+    else if (x > top.value && top.leftSize <= top.rightSize) {
+      value = x,
+      left = push(top.left, top.value),
+      right = top.right,
+      leftSize = top.leftSize + 1,
+      rightSize = top.rightSize
+    } else if (x > top.value) {
+      value = x,
+      left = top.left,
+      right = push(top.right, top.value),
+      leftSize = top.leftSize,
+      rightSize = top.rightSize + 1
+    } else if (x <= top.value && top.leftSize <= top.rightSize) {
+      value = top.value,
+      left = push(top.left, x),
+      right = top.right,
+      leftSize = top.leftSize + 1,
+      rightSize = top.rightSize
+    } else {
+      value = top.value,
+      left = top.left,
+      right = push(top.right, x),
+      leftSize = top.leftSize,
+      rightSize = top.rightSize + 1
+    }
+
+  pop <- (top: Node) -> Node => 
+    if (top.left.value > top.right.value) {
+      value = top.left.value,
+      left = pop(top.left),
+      right = top.right,
+      leftSize = top.leftSize - 1,
+      rightSize = top.rightSize
+    } else {
+      value = top.right.value,
+      left = top.left,
+      right = pop(top.right),
+      leftSize = top.leftSize,
+      rightSize = top.rightSize - 1
+    }
+} in ({
+  newHeap = {},
+  push = (top: Node) => (x: T) =>
+    if (top) push(top, x) else { 
+      value = x,
+      left = {},
+      right = {},
+      leftSize = 0,
+      rightSize = 0
+    },
+  pop = (top: Node) =>
+    if (top) pop(top) else { error = "Using pop with an empty Heap." }
+} <| Node)
+
+Pair = (T: Set, U: Set) => { first: T, second: U }
+#<=> = #<=> <| (lhs: Pair(Int, Int), rhs: Pair(Int, Int)) => 
+  if (lhs.first != rhs.first)
+    lhs.first <=> rhs.first
+  else
+    lhs.second <=> rhs.second
+
+dijkstra = (graph: Pair(Int, Int)[][], source: Int) -> Int[] => let {
+  Env = {
+    dist: Int[],
+    visited: Bool[],
+    q: Heap(Pair(Int, Int)) as Set
+  },
+
+  #fixedSizeArr <- <T> (size: Int, x: T) =>
+    if (size != 0)
+      Array.concat([x], #fixedSizeArr(size - 1, x))
+    else
+      [] as T[],
+
+  env = {
+    dist = #fixedSizeArr(Array.length(graph), infinity as Int)
+           |> `Array.modify(_, source, 0)`,
+    visited = #fixedSizeArr(Array.length(graph), false as Bool)
+           |> `Array.modify(_, source, true)`,
+    q = newHeap |> `push(_, { first = 0, second = source })`
+        where Heap(Pair(Int, Int))
+  } as Env,
+
+  while = (env, cond, modify) => let {
+    loop <- (cur) => if (env |> cond) loop(cur |> modify) else cur
+  } in loop(env),
+
+  update = (cur: Env) -> Env => let {
+      d = cur.q.value.first,
+      u = cur.q.value.second,
+      q = cur.q |> `Heap(Pair(Int, Int)).pop(_)`,
+      visited = cur.visited |> `Array.modify(_, u, true)`,
+
+      updateOnce = (cur: Env, v: Int, w: Int) -> Env => (
+        cur <| {
+          dist = if (dist[u] + w < dist[v])
+            dist |> `Array.modify(_, v, dist[u] + w)`,
+          q = q |> `push(_, { first = dist[v], second = v })`
+            where Heap(Pair(Int, Int)),
+        }),
+      
+      cur = { dist, visited, q },
+
+      cur = cur <| 
+        (if (!visited[u])
+          Array.fold(
+            graph[u],
+            { dist, visited, q },
+            (acc: Env, x: Pair(Int, Int)) =>
+              updateOnce(acc, v, w)
+                where { v = x.first, w = x.second }))
+    } in cur,
+
+  env = while(env, `_.q`, update),
+} in env.dist

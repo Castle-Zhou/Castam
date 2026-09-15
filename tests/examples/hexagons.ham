@@ -1,0 +1,17 @@
+{ os } = import("os")
+{ cl } = import("cl")
+
+hexagons = (x: Int, y: Int) -> Char[][] =>
+  let {
+    repeat = (times: Int, str: Char[]) -> Char[] =>
+      if (times == 0) "" else Array.concat(str, repeat(times - 1, str))
+  } in if (y == 0) [] as String[] 
+    else Array.concat(repeat(x, "/ \\_"), repeat(x, "\\_/ "), hexagons(x, y - 1)),
+
+main = (os) => os.output(
+  hexagons(12, 17)
+  |> `fold(_, "", (acc, str) => concat(acc, str, "\n"))`
+  where Array
+),
+
+mainCl = cl(main(os)),
