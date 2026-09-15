@@ -187,6 +187,13 @@ namespace castam {
                 return makeNode(std::move(root), SrcLoc{1, 1});
             }
 
+            // 单表达式入口（HAM 0x08 的 --entry / REPL）：表达式 + Eof
+            NodePtr runExpression() {
+                NodePtr e = parseExpr(1);
+                expect(TK::Eof, "表达式结尾");
+                return e;
+            }
+
         private:
             const std::vector<Token> &toks_;
             size_t i_ = 0;
@@ -874,6 +881,12 @@ namespace castam {
         NodePtr root = Parser(tokens).run();
         checkPlaceholdersDelimited(*root);
         return root;
+    }
+
+    NodePtr parseExpression(const std::vector<Token> &tokens) {
+        NodePtr e = Parser(tokens).runExpression();
+        checkPlaceholdersDelimited(*e);
+        return e;
     }
 
 } // namespace castam

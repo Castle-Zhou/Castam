@@ -45,6 +45,33 @@ static void P(const std::string &body, const std::string &inner) {
     checkParse(body, "(comb " + inner + ")");
 }
 
+// parseExpression 入口（HAM 0x08）：裸表达式，无 comb 包装
+static void checkExprParse(const std::string &src, const std::string &want) {
+    std::string got;
+    try {
+        got = dumpAst(*parseExpression(lex(src)));
+    } catch (const std::exception &e) {
+        std::cerr << "parseExpression threw for: " << src << "\n  " << e.what() << '\n';
+        ++g_failures;
+        return;
+    }
+    if (got != want) {
+        std::cerr << "parseExpression mismatch for: " << src << "\n  got:  " << got
+                  << "\n  want: " << want << '\n';
+        ++g_failures;
+    }
+}
+
+static void checkExprError(const std::string &src) {
+    try {
+        parseExpression(lex(src));
+    } catch (const ParseError &) {
+        return;
+    }
+    std::cerr << "expected ParseError for: " << src << '\n';
+    ++g_failures;
+}
+
 // 优先级（HAM 0x07 附录）
 
 static void testPrecedence() {
@@ -286,6 +313,21 @@ static void testCallsAndPostfix() {
     P("s = (a,)", "(decl s (struct (ident a)))");
 }
 
+// 单表达式入口 parseExpression（HAM 0x08 的 --entry / REPL）
+
+static void testExpressionEntry() {
+    checkExprParse("2 |> `legs(_, 3)`",
+                   "(|> (int 2) (lambda* (_) (call (ident legs) (placeholder) (int 3))))");
+    checkExprParse("arr2 | `_ > 1`",
+                   "(| (ident arr2) (lambda* (_) (> (placeholder) (int 1))))");
+    // 结尾必须是 Eof
+    checkExprError("a b");
+    // 裸 `_` 同样执行收尾校验
+    checkExprError("_ + 1");
+    // 同一串走 parse() 仍只允许声明
+    checkError("2 |> `legs(_, 3)`");
+}
+
 // 语法错误
 
 static void testErrors() {
@@ -350,6 +392,7 @@ int main() {
     testOperatorRefs();
     testOpTable();
     testTempCombAndIf();
+    testExpressionEntry();
     testCallsAndPostfix();
     testErrors();
     testGuards();
