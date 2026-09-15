@@ -275,14 +275,18 @@ namespace castam {
                 }
                 if (at(TK::Ident)) {
                     std::string base = advance().text;
-                    PatPath path{base, {}, {}};
+                    PatPath path{base, {}};
                     bool extended = false;
-                    while (at(TK::Dot)) {
-                        if (peek(1).kind == TK::Ident) {
+                    while (true) {
+                        if (at(TK::Dot) && peek(1).kind == TK::Ident) {
+                            // .x 键段
                             advance();
-                            path.segs.push_back(advance().text);
+                            path.segs.push_back(
+                                PatSeg{PatSeg::Kind::Key, advance().text, nullptr, {}});
                             extended = true;
-                        } else if (peek(1).kind == TK::LBrace) {
+                            continue;
+                        }
+                        if (at(TK::Dot) && peek(1).kind == TK::LBrace) {
                             // .{a, b} 扩展尾段，必须是最后一段
                             advance();
                             advance();
@@ -290,8 +294,9 @@ namespace castam {
                                 i_ = save;
                                 return false;
                             }
+                            PatSeg seg{PatSeg::Kind::ExtKeys, "", nullptr, {}};
                             while (true) {
-                                path.extKeys.push_back(advance().text);
+                                seg.keys.push_back(advance().text);
                                 if (eat(TK::Comma)) {
                                     if (at(TK::RBrace))
                                         break;
@@ -307,11 +312,25 @@ namespace castam {
                                 i_ = save;
                                 return false;
                             }
+                            path.segs.push_back(std::move(seg));
                             extended = true;
                             break;
-                        } else {
-                            break;
                         }
+                        if (at(TK::LBracket)) {
+                            // [i] 下标段（HAM 0x06：覆写由中括号拿到的引用），
+                            // 与键段任意混合（a[0].b = 1）
+                            advance();
+                            NodePtr idx = parseExpr(1);
+                            if (!eat(TK::RBracket)) {
+                                i_ = save;
+                                return false;
+                            }
+                            path.segs.push_back(
+                                PatSeg{PatSeg::Kind::Index, "", std::move(idx), {}});
+                            extended = true;
+                            continue;
+                        }
+                        break;
                     }
                     if (!extended) {
                         out = PatIdent{base};

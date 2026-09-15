@@ -60,10 +60,18 @@ namespace castam {
     struct PatIdent {
         std::string name;
     };
+    // 路径 pattern 的一段：.x 键（HAM 0x00）、[i] 下标（HAM 0x06）、.{a, b} 扩展
+    struct PatSeg {
+        enum class Kind { Key,
+                          Index,
+                          ExtKeys } kind;
+        std::string key;               // Key
+        NodePtr index;                 // Index（下标表达式）
+        std::vector<std::string> keys; // ExtKeys（.{a, b}）
+    };
     struct PatPath {
-        std::string base;                 // comb.x / comb.{a, b} 的 comb
-        std::vector<std::string> segs;    // .x.y 的键链
-        std::vector<std::string> extKeys; // .{a, b} 的键列表，为空表示无此尾段
+        std::string base;         // comb.x / arr3[1] / comb.{a, b} 的首段
+        std::vector<PatSeg> segs; // 键/下标可任意混合（a[0].b），ExtKeys 只能是末段
     };
     // 解构的键：type 可空，非空是键的取值约束（HAM 0x01 组合模式参数的 { x: { 1 } }）
     struct PatKeyField {

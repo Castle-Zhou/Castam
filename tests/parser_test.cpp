@@ -83,6 +83,13 @@ static void testBracesAndPatterns() {
     P("comb.x = 2", "(decl (path comb x) (int 2))");
     P("comb.{a, b} = c", "(decl (path comb {a b}) (ident c))");
     P("{x, y} = comb", "(decl (destr x y) (ident comb))");
+    // 下标路径（HAM 0x06：覆写由中括号拿到的引用），键/下标可任意混合
+    P("arr3 = [1, 2, 3]\narr3[1] = 2",
+      "(decl arr3 (array (int 1) (int 2) (int 3)))"
+      " (decl (path arr3 [(int 1)]) (int 2))");
+    P("a[0].b = 1", "(decl (path a [(int 0)] b) (int 1))");
+    P("a.b[0] = 1", "(decl (path a b [(int 0)]) (int 1))");
+    P("arr3[i + 1] = 2", "(decl (path arr3 [(+ (ident i) (int 1))]) (int 2))");
 
     // 逗号可选（HAM 0x00）
     P("x = 1 y = 2", "(decl x (int 1)) (decl y (int 2))");

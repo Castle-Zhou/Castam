@@ -30,6 +30,12 @@ static NodePtr bin(BinOp op, NodePtr l, NodePtr r) {
 static Decl decl(Pattern p, NodePtr v, bool recursive = false) {
     return Decl{std::move(p), std::move(v), recursive};
 }
+// PatSeg 含 move-only 的 NodePtr，vector 不能用 initializer_list，逐段 push_back
+static PatSeg pkey(const char *k) { return PatSeg{PatSeg::Kind::Key, k, nullptr, {}}; }
+static PatSeg pidx(NodePtr i) { return PatSeg{PatSeg::Kind::Index, "", std::move(i), {}}; }
+static PatSeg pext(std::vector<std::string> ks) {
+    return PatSeg{PatSeg::Kind::ExtKeys, "", nullptr, std::move(ks)};
+}
 
 // 字面量与名字
 
@@ -52,9 +58,16 @@ static void testLiterals() {
 static void testCombAndPatterns() {
     CombLit comb;
     comb.items.push_back(decl(PatIdent{"x"}, num("1")));
-    comb.items.push_back(decl(PatPath{"comb", {"x"}, {}}, num("2")));
-    comb.items.push_back(decl(PatPath{"comb", {}, {"a", "b"}}, id("comb1")));
-    comb.items.push_back(decl(PatPath{"comb", {"x"}, {"a"}}, num("3")));
+    PatPath p1{"comb", {}};
+    p1.segs.push_back(pkey("x"));
+    comb.items.push_back(decl(std::move(p1), num("2")));
+    PatPath p2{"comb", {}};
+    p2.segs.push_back(pext({"a", "b"}));
+    comb.items.push_back(decl(std::move(p2), id("comb1")));
+    PatPath p3{"comb", {}};
+    p3.segs.push_back(pkey("x"));
+    p3.segs.push_back(pext({"a"}));
+    comb.items.push_back(decl(std::move(p3), num("3")));
     PatDestructure destr;
     destr.keys.push_back(PatKeyField{"x", nullptr});
     destr.keys.push_back(PatKeyField{"y", nullptr});
@@ -76,6 +89,14 @@ static void testCombAndPatterns() {
     dcomb.items.push_back(decl(std::move(ddestr), id("c")));
     checkDump(makeNode(std::move(dcomb)),
               "(comb (decl (destr x (y (ident Int))) (ident c)))");
+
+    // 下标路径段（HAM 0x06 的 arr3[1] = 2）
+    PatPath ip{"arr3", {}};
+    ip.segs.push_back(pidx(num("1")));
+    CombLit icomb;
+    icomb.items.push_back(decl(std::move(ip), num("2")));
+    checkDump(makeNode(std::move(icomb)),
+              "(comb (decl (path arr3 [(int 1)]) (int 2)))");
 }
 
 // 集合的三种表达式形态

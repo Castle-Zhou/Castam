@@ -51,16 +51,26 @@ namespace castam {
                         out += pat.name;
                     } else if constexpr (std::is_same_v<T, PatPath>) {
                         out += "(path " + pat.base;
-                        for (const auto &s : pat.segs)
-                            out += " " + s;
-                        if (!pat.extKeys.empty()) {
-                            out += " {";
-                            for (size_t i = 0; i < pat.extKeys.size(); ++i) {
-                                if (i)
-                                    out += " ";
-                                out += pat.extKeys[i];
+                        for (const auto &s : pat.segs) {
+                            switch (s.kind) {
+                            case PatSeg::Kind::Key:
+                                out += " " + s.key;
+                                break;
+                            case PatSeg::Kind::Index:
+                                out += " [";
+                                dumpChild(s.index, out);
+                                out += "]";
+                                break;
+                            case PatSeg::Kind::ExtKeys:
+                                out += " {";
+                                for (size_t i = 0; i < s.keys.size(); ++i) {
+                                    if (i)
+                                        out += " ";
+                                    out += s.keys[i];
+                                }
+                                out += "}";
+                                break;
                             }
-                            out += "}";
                         }
                         out += ")";
                     } else if constexpr (std::is_same_v<T, PatDestructure>) {
